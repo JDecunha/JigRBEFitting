@@ -4,6 +4,5 @@
 
 int main()
 {
-	//H460Fitting();
-	LinealSpectra::CompareGeant4toFluenceWeighting();
+	H460Fitting();
 }
