@@ -127,19 +127,24 @@ void H460Fitting()
 	fitterold.SetCellStudyParameters(H460Params);
 
 
-	//Linear function fitting
+	//Create linear BWF
 	BiologicalWeightingFunction LinearandFixedBWF;
 	LinearandFixedBWF.SetWeightingFunction([](double* params, double linealEnergy) {return (params[1]*linealEnergy)+params[0];}, 2);
+	//Linear function fitting
 	fitter.SetWeightingFunction(LinearandFixedBWF);
 	double linearInitialGuess [] = {1, 1, 0.097};
 	double* LinearandFixedParams = fitter.Fit(linearInitialGuess,true);
 
-	//Quadratic function fitting
+	//Create quadratic BWF
 	BiologicalWeightingFunction QuadraticLinearFixedBWF;
 	QuadraticLinearFixedBWF.SetWeightingFunction([](double* params, double linealEnergy) {return (params[2]*linealEnergy*linealEnergy+params[1]*linealEnergy+params[0]);}, 3);
+	//BWF Function Fitting
 	fitterold.SetWeightingFunction(QuadraticLinearFixedBWF);
-	double quadraticInitialGuess [] = {1, 1, 1};//, 0.097};
+	double quadraticInitialGuess [] = {0.3, 0.1, 0};//, 0.097};
 	double* QuadraticLinearFixedParams = fitterold.Fit(quadraticInitialGuess,true);
+	fitter.SetWeightingFunction(QuadraticLinearFixedBWF);
+	double quadraticInitialGuess2 [] = {0.3, 0.1, 0, 0.097};//, 0.097};
+	double* QuadraticLinearFixedParams2 = fitter.Fit(quadraticInitialGuess2,true);
 
 
 	//
@@ -171,8 +176,9 @@ void H460Fitting()
 	lineStyle.SetLineColor(kRed+2);
 	GeneralizedBWFMultigraphPlotterBeta(c, legend, lineStyle, "Linear BWF", H460Params, LinearandFixedBWF, LinearandFixedParams);
 
-	GeneralizedBWFMultigraphPlotter(c, legend, lineStyle, "Quadratic BWF", H460Params, QuadraticLinearFixedBWF, QuadraticLinearFixedParams);
 	lineStyle.SetLineColor(kBlue+4);
+	GeneralizedBWFMultigraphPlotterBeta(c, legend, lineStyle, "Quadratic BWF", H460Params, QuadraticLinearFixedBWF, QuadraticLinearFixedParams2);
+	
 
 
 	//Save

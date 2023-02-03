@@ -67,7 +67,7 @@ void GeneralizedBWFMultigraphPlotterBeta(TCanvas* c, TLegend* legend, const TAtt
 	const std::vector<std::pair<std::string,TH1D>> DySpectra = survivalParams.dySpectra;
 	const std::vector<std::vector<double>> doselist = survivalParams.dose;
 	const int nParams = fittingFunction.GetNumFittingParams();
-	const double beta = fitFuncParams[nParams-1];
+	const double beta = fitFuncParams[nParams];
 
 	bool legendAdded = false; 
 	if (legendName == "") { legendAdded = true; }
