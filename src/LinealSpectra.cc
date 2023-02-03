@@ -1,22 +1,3 @@
-//std
-#include <iostream>
-#include <filesystem>
-#include <vector>
-#include <utility>
-#include <string>
-
-//ROOT
-#include "TH1F.h"
-#include "TTree.h"
-#include "TTreeReader.h"
-#include "TH1D.h"
-#include "TString.h"
-#include "TFile.h"
-#include "TCanvas.h"
-#include "TStyle.h"
-#include "TSystem.h"
-#include "TLatex.h"
-
 //This project
 #include "LinealSpectra.h"
 #include "Utilities.h"
@@ -37,7 +18,7 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetMonoenergeticLinealSp
 	//Have to make a dictionary so that CERN ROOT can properly load and save STD library types from files
 	gInterpreter->GenerateDictionary("pair<string,TH1F>;vector<pair<string,TH1F> >", "TH1.h;string;utility;vector");
 
-	std::vector<std::pair<std::string, TH1D>> monoenergeticSpectra; //List to hold our f(y) spectrum
+	std::vector<std::pair<std::string, TH1D>> monoenergeticSpectra; //List to hold our d(y) spectrum
 	std::vector<std::pair<std::string,TH1F>>* keSpectra; //A pointer to Fada's KE spectrum
 
 	//Pull the data from our KE-spectrum file.
@@ -156,7 +137,7 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpect
 		for (int i = 2; i <= KESpectrum.GetNbinsX(); ++i) //start at 2 to skip underflow and 0.0 MeV bin
 		{
 			//Because of the way we re-defined the KE histogram, "GetBinLowEdge" actually corresponds to the middle
-			TH1D tempLinealSpectrum = utils::GetDy(fyFolder, KESpectrum.GetBinLowEdge(i), targetSize); //Get the f(y) spectrum at that energy
+			TH1D tempLinealSpectrum = utils::GetNy(fyFolder, KESpectrum.GetBinLowEdge(i), targetSize); //Get the f(y) spectrum at that energy
 
 			//Scale the spectrum by the fluence
 			tempLinealSpectrum.Scale(KESpectrum.GetBinContent(i));
@@ -166,8 +147,8 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpect
 		}	
 		
 		//For verifying normalization
-		//utils::VerifyNormalization(outputLinealSpectrum); //Shows all spectra are normalized to 1 within 1e-7
-
+			//utils::PMF_to_DoseFunction(&outputLinealSpectrum);
+			//utils::VerifyNormalization(outputLinealSpectrum); //Shows all spectra are normalized to 1 within 1e-7
 		linealEnergyLibrary.push_back(std::make_pair<std::string,TH1D>(std::move(KEColumnName),std::move(outputLinealSpectrum)));
 	}
 
@@ -292,6 +273,105 @@ void LinealSpectra::PlotKeWeightedLinealSpectraMultigraph(const std::vector<std:
 	c->SaveAs((TString)outputName);
 
 	delete c;
+}
+
+void LinealSpectra::CompareGeant4toFluenceWeighting()
+{
+	gStyle->SetOptStat(0); //Don't print the stats window in the top right
+
+	TCanvas* c = new TCanvas("c","c");
+	c->SetCanvasSize(2040, 1640);
+	c->SetWindowSize(2040, 1640);
+	c->SetLeftMargin(0.15);
+	c->SetBottomMargin(0.15);
+
+	//Fada A
+	// std::string path = "/home/joseph/Downloads/STV/proton_fada_A_1um_688576084.root";
+
+	//Fada
+	std::string path = "/home/joseph/Downloads/STV/proton_fada_G_1um_1501494966.root";
+	
+	//Get the KeWeighted lineal energy spectra
+	auto keWeightedSpectra = LinealSpectra::GetKeWeightedLinealSpectra();
+
+	TFile f = TFile((TString)path);
+	//TFile f2 = TFile((TString)path2);
+
+	TH1D* h;
+	TH1D* h2 = new TH1D(std::get<1>(keWeightedSpectra[6]));
+	h = (TH1D*)f.Get("f(y)");
+	// h2 = (TH1D*)f2.Get("Lineal energy histogram");
+	//Print_TH1(h); //To manually print the bin values
+	Utilities::PMF_to_DoseFunction(h);
+	Utilities::Prepare_for_Semilog(h);
+	Utilities::PMF_to_DoseFunction(h2);
+	Utilities::Prepare_for_Semilog(h2);
+
+	gStyle->SetTitleFont(42,"t");
+
+	h->Draw("HIST");
+	h2->Draw("same");
+	
+	//Set range
+	//h2->GetYaxis()->SetRangeUser(0,1);
+	//h->GetYaxis()->SetRangeUser(0,1);
+
+	//Set titles
+	//std::string title = std::to_string(int(energy));
+	//title += " MeV";
+	h->SetTitle("");
+	//h2->SetTitle("");
+	h->SetTitleSize(0.03,"t"); //this doesn't do anything
+	h->GetYaxis()->SetTitle("y #upoint d(y)");
+	h->GetXaxis()->SetTitle("y [#frac{keV}{#mum}]");
+
+	h->GetXaxis()->CenterTitle(true);
+	h->GetYaxis()->CenterTitle(true);
+	h->GetXaxis()->SetTitleFont(42);
+	h->GetYaxis()->SetTitleFont(42);
+	h->GetXaxis()->SetTitleSize(0.042);
+	h->GetYaxis()->SetTitleSize(0.048);
+	h->GetXaxis()->SetTitleOffset(1.50); //Offset x axis so no overlap
+
+	//Center
+	h->GetXaxis()->CenterTitle(true);
+	h->GetYaxis()->CenterTitle(true);
+
+	//Offset x axis so no overlap
+	h->GetXaxis()->SetTitleOffset(1.2);
+	h->GetYaxis()->SetTitleOffset(1.2);
+
+	h->GetXaxis()->SetTitleFont(42);
+	h->GetYaxis()->SetTitleFont(42);
+
+
+	//h->SetFillColorAlpha(kRed, 0.4);
+	//h->SetFillStyle(3001);
+	h->SetLineColor(kBlack);
+	h->SetLineWidth(7);
+
+	//h2->SetFillColorAlpha(kAzure+3, 0.5);
+	//h->SetFillStyle(3001);
+	h2->SetFillColorAlpha(kAzure+3, 0.5);
+	h2->SetLineColor(kBlack);
+	h2->SetLineWidth(0);
+
+	gPad->SetLogx();
+
+	//auto legend = new TLegend(0.18,0.73,0.18+0.26,0.73+0.15);//x start, y start, x end, yend
+	double xstart = 0.71;
+	auto legend = new TLegend(xstart,0.73,xstart+0.17,0.73+0.15);//x start, y start, x end, yend
+	//legend->SetHeader("","C"); // option "C" allows to center the header
+	legend->AddEntry(h,"Geant4","L");
+	legend->AddEntry(h2,"SuperTrack","f");
+	//legend->AddEntry(g5,"10 #mum","L");
+	//legend->AddEntry(g6,"1","L");
+	//legend->AddEntry(g5,"1 Million Tracks","P");
+	legend->SetTextSize(0.030);
+	legend->Draw();
+
+	c->Update();
+	c->Print("/home/joseph/Dropbox/Documents/Work/Projects/MDA_Microdosimetry/Images/SuperTrackValidation/FadaG2.jpg"); 
 }
 
 void LinealSpectra::SaveKeWeightedLinealSpectra()

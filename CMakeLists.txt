@@ -8,6 +8,9 @@ set(CMAKE_CXX_STANDARD "17")
 find_package(ROOT 6.25 CONFIG REQUIRED)
 include("${ROOT_USE_FILE}") #include the ROOT CMakelists which defines $ROOT_LIBRARIES
 
+### Find GNU Scientific Library
+find_package(GSL REQUIRED)   
+
 ### Configure executable
 add_executable(JigRBE JigRBEFitting.cc)
 
@@ -15,6 +18,6 @@ add_executable(JigRBE JigRBEFitting.cc)
 add_subdirectory(src)
 
 #Link my project
-target_link_libraries(JigRBE PRIVATE src ${ROOT_LIBRARIES})
+target_link_libraries(JigRBE PRIVATE src ${ROOT_LIBRARIES} GSL::gsl)
 
 

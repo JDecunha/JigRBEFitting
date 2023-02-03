@@ -1,9 +1,8 @@
 //std
 #include <iostream>
+#include <fstream>
 #include <filesystem>
-#include <vector>
 #include <utility>
-#include <string>
 
 //ROOT
 #include "TH1F.h"
@@ -81,8 +80,8 @@ TH1F ProtonSpectra::GetFadaSpectrumRebinned(const std::string& column)
 	//Create the newBins we want to output with
 	std::vector<double> newBins;
 	newBins.reserve(90); //pre-allocate memory so it's faster
-	std::vector<double> firstBinValues = utils::Linspace(0,0.9,10); 
-	std::vector<double> lastBinValues = utils::Linspace(1,80,80);
+	std::vector<double> firstBinValues = utils::Linspace(0,0.9,10); //from 0-0.9 MeV
+	std::vector<double> lastBinValues = utils::Linspace(1,80,80); //from 1-80 MeV
 	//Insert the new bins into the vector
 	newBins.insert(newBins.end(),firstBinValues.begin(),firstBinValues.end()); 
 	newBins.insert(newBins.end(),lastBinValues.begin(),lastBinValues.end());
@@ -90,18 +89,20 @@ TH1F ProtonSpectra::GetFadaSpectrumRebinned(const std::string& column)
 	//New histogram
 	TH1F KE_spectrum_averaged = TH1F("KE Spectrum Rebinned"," ",(newBins.size()-1), newBins.data());
 	
-	for (int i = 1; i < 10; i++) //rebin from 0.1 - 0.9 MeV with averaging
+	//Part 2.1: rebin from 0.1 - 0.9 MeV with averaging
+	for (int i = 1; i < 10; i++) 
 	{
 		std::pair<float,float> binAverageAndCenter = utils::GetHistogramAverage(KE_spectrum, i, i+1);
 		KE_spectrum_averaged.Fill(std::get<1>(binAverageAndCenter), std::get<0>(binAverageAndCenter));
 	}
 
-	//1 MeV is the 'in between' bin, so average from 0.9-1.4 MeV
+	//Part 2.2: rebin 1 MeV. 1 MeV is the 'in between' bin, so average from 0.9-1.4 MeV
 	KE_spectrum.SetBinContent(10, KE_spectrum.GetBinContent(10)*0.5); //Halve the 0.9 MeV bin
 	std::pair<float,float> binAverageAndCenter = utils::GetHistogramAverage(KE_spectrum, 10, 15); //10th bin is 0.9, 15th is 1.4 MeV
 	KE_spectrum_averaged.Fill(std::get<1>(binAverageAndCenter), std::get<0>(binAverageAndCenter)*6); //multiply by the 6 combined bins
 
-	for (int i = 0; i < 78; ++i) //rebin from 2-79 MeV
+	//Part 2.3: rebin from 2-79 MeV
+	for (int i = 0; i < 78; ++i) 
 	{
 		std::pair<float,float> binAverageAndCenter = utils::GetHistogramAverage(KE_spectrum, 16+(10*i), 16+9+(10*i)); //I hate using hardcoded numbers
 
@@ -152,4 +153,21 @@ void ProtonSpectra::SaveFadaSpectra()
 	delete spectrumFile;
 }
 
+void ProtonSpectra::PrintProtonSpectrumForGeantValidation(const std::string& column)
+{
+	TH1F protonSpectrum = GetFadaSpectrumRebinned(column);
+
+	std::filesystem::path outputPath = std::filesystem::path("/home/joseph/Documents/PHD_local/GeantValidationSpectra");
+	std::ofstream outputStream(outputPath.string() + "/spectrum_" + column + "_.txt");
+
+	if (outputStream.is_open())
+	{
+		for (int i = 1; i <= protonSpectrum.GetNbinsX(); ++i)
+		{
+			outputStream << "/gps/hist/point " << protonSpectrum.GetBinCenter(i) << " " << protonSpectrum.GetBinContent(i) << "\n";
+		}
+	}
+	else {std::cout << "file failed to open" << std::endl;}
+	
+}
 
