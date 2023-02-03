@@ -97,7 +97,7 @@ void SetupH460SurvivalParameters()
 	//Get the lineal energy spectra library
 	gInterpreter->GenerateDictionary("pair<string,TH1F>;vector<pair<string,TH1F> >", "TH1.h;string;utility;vector");
 	std::vector<std::pair<std::string, TH1D>>* dySpectraLibrary;
-	TFile* dySpectrumFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealSpectraCellStudy.root");
+	TFile* dySpectrumFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealSpectraCellStudy_1e3nm.root");
 	dySpectrumFile->GetObject("Lineal_energy_library",dySpectraLibrary);
 	dySpectrumFile->Close(); //Close file
 
@@ -126,33 +126,15 @@ void H460Fitting()
 	BWF_Fitter fitterold{};
 	fitterold.SetCellStudyParameters(H460Params);
 
-
-	//Create linear BWF
-	BiologicalWeightingFunction LinearandFixedBWF;
-	LinearandFixedBWF.SetWeightingFunction([](double* params, double linealEnergy) {return (params[1]*linealEnergy)+params[0];}, 2);
-	//Linear function fitting
-	fitter.SetWeightingFunction(LinearandFixedBWF);
-	double linearInitialGuess [] = {1, 1, 0.097};
-	double* LinearandFixedParams = fitter.Fit(linearInitialGuess,true);
-
 	//Create quadratic BWF
 	BiologicalWeightingFunction QuadraticLinearFixedBWF;
 	QuadraticLinearFixedBWF.SetWeightingFunction([](double* params, double linealEnergy) {return (params[2]*linealEnergy*linealEnergy+params[1]*linealEnergy+params[0]);}, 3);
-	//BWF Function Fitting
-	fitterold.SetWeightingFunction(QuadraticLinearFixedBWF);
-	double quadraticInitialGuess [] = {0.3, 0.1, 0};//, 0.097};
-	double* QuadraticLinearFixedParams = fitterold.Fit(quadraticInitialGuess,true);
 	fitter.SetWeightingFunction(QuadraticLinearFixedBWF);
-	double quadraticInitialGuess2 [] = {0.3, 0.1, 0, 0.097};//, 0.097};
-	double* QuadraticLinearFixedParams2 = fitter.Fit(quadraticInitialGuess2,true);
+	double quadraticInitialGuess [] = {0.3, 0.1, 0, 0.097};//, 0.097};
+	double* QuadraticLinearFixedParams = fitter.Fit(quadraticInitialGuess,true);
 
 
-	//
-	//Plotting
-	//
-	
-	//Plotting the survival data
-
+	//Plot
 	//Setup the canvas
 	gStyle->SetOptStat(0); //Don't print the stats window in the top right
 	TCanvas* c = new TCanvas("c","c");
@@ -160,7 +142,8 @@ void H460Fitting()
 	c->SetFillStyle(4000);
 	c->SetFrameFillStyle(4000);
 	c->Divide(4,3,0.000000005,0.001);
-	auto legend = new TLegend(0.52,0.72,0.89,0.72+0.16);//x start, y start, x end, yend
+	//auto legend = new TLegend(0.52,0.72,0.89,0.72+0.16);//x start, y start, x end, yend
+	auto legend = new TLegend(0.14,0.14,0.14+0.39,0.14+0.16);
 	legend->SetTextSize(0.05);
 
 	//Setup the marker attributes
@@ -174,16 +157,38 @@ void H460Fitting()
 
 	//Plot the BWF prediction on the survival data
 	lineStyle.SetLineColor(kRed+2);
-	GeneralizedBWFMultigraphPlotterBeta(c, legend, lineStyle, "Linear BWF", H460Params, LinearandFixedBWF, LinearandFixedParams);
+	GeneralizedBWFMultigraphPlotterBeta(c, legend, lineStyle, "Quadratic, 1 um", H460Params, QuadraticLinearFixedBWF, QuadraticLinearFixedParams);
 
+	//Get the lineal energy spectra library
+	gInterpreter->GenerateDictionary("pair<string,TH1F>;vector<pair<string,TH1F> >", "TH1.h;string;utility;vector");
+	std::vector<std::pair<std::string, TH1D>>* dySpectraLibrary;
+	TFile* dySpectrumFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealSpectraCellStudy_10nm.root");
+	dySpectrumFile->GetObject("Lineal_energy_library",dySpectraLibrary);
+	dySpectrumFile->Close(); //Close file
+
+	// //Re-fit with 100 nm microdosimetric spectra
+	H460Params.dySpectra = *dySpectraLibrary;
+	fitter.SetCellStudyParameters(H460Params);
+	double quadraticInitialGuess2 [] = {0.3, 0.1, 0, 0.097};//, 0.097};
+	double* QuadraticLinearFixedParams2 = fitter.Fit(quadraticInitialGuess2,true);
+
+	//Plotting the survival data
 	lineStyle.SetLineColor(kBlue+4);
-	GeneralizedBWFMultigraphPlotterBeta(c, legend, lineStyle, "Quadratic BWF", H460Params, QuadraticLinearFixedBWF, QuadraticLinearFixedParams2);
+	GeneralizedBWFMultigraphPlotterBeta(c, legend, lineStyle, "Quadratic, 10 nm", H460Params, QuadraticLinearFixedBWF, QuadraticLinearFixedParams2);
 	
-
-
 	//Save
-	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/FitswithBeta.jpg";
+	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/10nm_quadratic_fit_test.jpg";
 	c->SaveAs((TString)outputName); 
+
+	// GeneralizedBWFMultigraphPlotterBeta(c, legend, lineStyle, "Quadratic BWF", H460Params, QuadraticLinearFixedBWF, QuadraticLinearFixedParams2);
+
+
+
+
+	//
+	//Plotting
+	//
+	
 
 
 

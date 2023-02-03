@@ -99,7 +99,7 @@ void LinealSpectra::PlotMonoenergeticLinealSpectra(const std::vector<std::pair<s
 	delete c;
 }
 
-std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpectra()
+std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpectra(std::string targetSize)
 {
 	/*
 	Retrieves the lineal energy spectra calculated at every location of the jig.
@@ -108,7 +108,7 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpect
 
 	//Specify hardcoded path to our f(y) library and target size
 	std::string fyFolder = "/home/joseph/Documents/PHD_local/July_2022/proton_5umVoxel_DNA2_10kTracks";
-	std::string targetSize = "1e3"; //1 um diameter target spheres
+
 
 	//Have to make a dictionary so that CERN ROOT can properly load and save STD library types from files
 	gInterpreter->GenerateDictionary("pair<string,TH1F>;vector<pair<string,TH1F> >", "TH1.h;string;utility;vector");
@@ -147,7 +147,7 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpect
 		}	
 		
 		//For verifying normalization
-			//utils::PMF_to_DoseFunction(&outputLinealSpectrum);
+			utils::PMF_to_DoseFunction(&outputLinealSpectrum);
 			//utils::VerifyNormalization(outputLinealSpectrum); //Shows all spectra are normalized to 1 within 1e-7
 		linealEnergyLibrary.push_back(std::make_pair<std::string,TH1D>(std::move(KEColumnName),std::move(outputLinealSpectrum)));
 	}
@@ -172,6 +172,7 @@ void LinealSpectra::PlotKeWeightedLinealSpectra(const std::vector<std::pair<std:
 	{
 			//Get the d(y) spectrum and multiply by y
 			TH1D* spectra = new TH1D(std::get<1>(linealSpectra));
+			// utils::PMF_to_DoseFunction(spectra);
 			utils::Prepare_for_Semilog(spectra); //Multiply by y, to get y*d(y)
 
 			//Get the name corresponding to the jig position
@@ -238,6 +239,7 @@ void LinealSpectra::PlotKeWeightedLinealSpectraMultigraph(const std::vector<std:
 
 			//Get the spectra and its ID
 			TH1D* spectra = new TH1D(std::get<1>(linealSpectra));
+			// utils::PMF_to_DoseFunction(spectra);
 			utils::Prepare_for_Semilog(spectra); //Multiply by y, to get y*d(y)
 			std::string name = std::get<0>(linealSpectra);
 
@@ -292,7 +294,7 @@ void LinealSpectra::CompareGeant4toFluenceWeighting()
 	std::string path = "/home/joseph/Downloads/STV/proton_fada_G_1um_1501494966.root";
 	
 	//Get the KeWeighted lineal energy spectra
-	auto keWeightedSpectra = LinealSpectra::GetKeWeightedLinealSpectra();
+	auto keWeightedSpectra = LinealSpectra::GetKeWeightedLinealSpectra("1e3");
 
 	TFile f = TFile((TString)path);
 	//TFile f2 = TFile((TString)path2);
@@ -380,12 +382,16 @@ void LinealSpectra::SaveKeWeightedLinealSpectra()
 	gInterpreter->GenerateDictionary("pair<string,TH1D>;vector<pair<string,TH1D> >", "TH1.h;string;utility;vector");
 
 	//Get the KeWeighted lineal energy spectra
-	auto keWeightedSpectra = GetKeWeightedLinealSpectra();
+	std::vector<std::string> targetSizes{"10","50","100","200","300","400","500","600","700","800","900","1e3"};
+	for (const auto& value : targetSizes)
+	{
+		auto keWeightedSpectra = GetKeWeightedLinealSpectra(value);
 
-	//Open the file and write the value
-	TFile* keWeightedLinealSpectraOutputFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealSpectraCellStudy.root","RECREATE");
-	keWeightedLinealSpectraOutputFile->WriteObject(&keWeightedSpectra, "Lineal_energy_library");
+		//Open the file and write the value
+		TFile* keWeightedLinealSpectraOutputFile = TFile::Open((TString)("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealSpectraCellStudy_"+value+"nm.root"),"RECREATE");
+		keWeightedLinealSpectraOutputFile->WriteObject(&keWeightedSpectra, "Lineal_energy_library");
 
-	//Close the file
-	keWeightedLinealSpectraOutputFile->Close();
+		//Close the file
+		keWeightedLinealSpectraOutputFile->Close();
+	}
 }
