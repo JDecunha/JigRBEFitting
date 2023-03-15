@@ -43,6 +43,40 @@ class CellStudySurvivalParameters
 
 };
 
+class CellStudyBWFFittingParameters
+{
+  public:
+    //Physical information
+    std::vector<std::pair<std::string,TH1D>> dySpectra;
+    std::vector<double> LETd;
+
+    //Survival information
+    std::vector<std::vector<double>> survivingFraction;
+    std::vector<std::vector<double>> survivingFractionUncertainty;
+    std::vector<std::vector<double>> dose;
+
+    //Beta from photons
+    double beta;
+
+    //The desired fitting function
+    BiologicalWeightingFunction alphaFittingFunction;
+    BiologicalWeightingFunction betaFittingFunction;
+
+    int GetNumDataPoints()
+    {
+      int i = 0;
+      for (const auto& experimentlist:dose)
+      {
+        for (const auto& individualirradiation:experimentlist)
+        {
+          ++i;
+        }
+      }
+      return i;
+    };
+
+};
+
 struct CellStudySurvivalParametersLETd
 {
   std::vector<double> LETd;

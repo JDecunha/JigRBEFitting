@@ -99,6 +99,64 @@ void LinealSpectra::PlotMonoenergeticLinealSpectra(const std::vector<std::pair<s
 	delete c;
 }
 
+std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedFrequencyLinealSpectra(std::string targetSize)
+{
+	/*
+	Retrieves the lineal energy spectra calculated at every location of the jig.
+	Returns a series of d(y) with jig location identifier.
+	*/
+
+	//Specify hardcoded path to our f(y) library and target size
+	std::string fyFolder = "/home/joseph/Documents/PHD_local/July_2022/proton_5umVoxel_DNA2_10kTracks";
+
+
+	//Have to make a dictionary so that CERN ROOT can properly load and save STD library types from files
+	gInterpreter->GenerateDictionary("pair<string,TH1F>;vector<pair<string,TH1F> >", "TH1.h;string;utility;vector");
+
+	//Pull the data from our KE-spectrum file
+	std::vector<std::pair<std::string,TH1F>>* keSpectra;
+	TFile* spectrumFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/FadasProtonSpectra.root");
+	spectrumFile->GetObject("Spectrum_Library",keSpectra);
+	spectrumFile->Close();
+	
+	//This will hold the output
+	std::vector<std::pair<std::string,TH1D>> linealEnergyLibrary; 
+	
+	for(const auto& spectra:*keSpectra)
+	{
+		//Step 1: Weight the lineal energy spectrum by the KE spectrum.
+		//Grab the KE specta for a given irradiation
+		TH1F KESpectrum = std::get<1>(spectra);
+		std::string KEColumnName = std::get<0>(spectra);
+
+		//Just get the bins for the output spectrum
+		TH1D outputLinealSpectrum = utils::GetDy(fyFolder, 0.1, targetSize);
+		outputLinealSpectrum.Scale(0); //to eliminate the data and leave the bins
+
+		//Loop over the KE spectrum and weight the f(y) spectra accordingly
+		for (int i = 2; i <= KESpectrum.GetNbinsX(); ++i) //start at 2 to skip underflow and 0.0 MeV bin
+		{
+			//Because of the way we re-defined the KE histogram, "GetBinLowEdge" actually corresponds to the middle
+			TH1D tempLinealSpectrum = utils::GetNy(fyFolder, KESpectrum.GetBinLowEdge(i), targetSize); //Get the N(y) spectrum at that energy
+
+			//Scale the spectrum by the fluence
+			tempLinealSpectrum.Scale(KESpectrum.GetBinContent(i));
+
+			//Add the weighted spectrum to the output fy spectrum
+			outputLinealSpectrum.Add(&tempLinealSpectrum);
+		}	
+		
+		//Convert N(y) to d(y)
+		utils::PMF_to_DoseFunction(&outputLinealSpectrum);
+		//utils::VerifyNormalization(outputLinealSpectrum); //Shows all spectra are normalized to 1 within 1e-7
+		linealEnergyLibrary.push_back(std::make_pair<std::string,TH1D>(std::move(KEColumnName),std::move(outputLinealSpectrum)));
+	}
+
+	delete keSpectra; //we own the keSpectra pointer so we have to delete it
+
+	return linealEnergyLibrary;
+}
+
 std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpectra(std::string targetSize)
 {
 	/*
@@ -137,7 +195,7 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpect
 		for (int i = 2; i <= KESpectrum.GetNbinsX(); ++i) //start at 2 to skip underflow and 0.0 MeV bin
 		{
 			//Because of the way we re-defined the KE histogram, "GetBinLowEdge" actually corresponds to the middle
-			TH1D tempLinealSpectrum = utils::GetNy(fyFolder, KESpectrum.GetBinLowEdge(i), targetSize); //Get the f(y) spectrum at that energy
+			TH1D tempLinealSpectrum = utils::GetNy(fyFolder, KESpectrum.GetBinLowEdge(i), targetSize); //Get the N(y) spectrum at that energy
 
 			//Scale the spectrum by the fluence
 			tempLinealSpectrum.Scale(KESpectrum.GetBinContent(i));
@@ -146,9 +204,9 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpect
 			outputLinealSpectrum.Add(&tempLinealSpectrum);
 		}	
 		
-		//For verifying normalization
-			utils::PMF_to_DoseFunction(&outputLinealSpectrum);
-			//utils::VerifyNormalization(outputLinealSpectrum); //Shows all spectra are normalized to 1 within 1e-7
+		//Convert N(y) to d(y)
+		utils::PMF_to_DoseFunction(&outputLinealSpectrum);
+		//utils::VerifyNormalization(outputLinealSpectrum); //Shows all spectra are normalized to 1 within 1e-7
 		linealEnergyLibrary.push_back(std::make_pair<std::string,TH1D>(std::move(KEColumnName),std::move(outputLinealSpectrum)));
 	}
 
@@ -230,6 +288,8 @@ void LinealSpectra::PlotKeWeightedLinealSpectraMultigraph(const std::vector<std:
 	c->SetCanvasSize(9000, 5000);
 	c->Divide(4,3);
 
+	std::vector<double> LETd{0.914, 1.16, 1.61, 1.81, 1.93, 2.34, 3.01, 5.08, 10.8, 15.2, 17.7, 19};
+
 	int i = 1;
 
 	//Now let's iterate through our lineal energy library, plot, and do all that nice stuff
@@ -266,12 +326,22 @@ void LinealSpectra::PlotKeWeightedLinealSpectraMultigraph(const std::vector<std:
 			spectra->SetLineStyle(1);
 
 			//Draw the inline title
-			TLatex *t = new TLatex(0.015, 0.935, (TString)name);
+			// Create an output string stream
+			std::ostringstream outputstream;
+			// Set Fixed -Point Notation
+			outputstream << std::fixed;
+			// Set precision to 2 digits
+			outputstream << std::setprecision(1);
+			//Add double to stream
+			outputstream << LETd[i-2];
+			std::string titlestring = outputstream.str() + " keV/#mum";
+			TLatex *t = new TLatex(0.015, 0.935, (TString)titlestring);
+			// TLatex *t = new TLatex(0.015, 0.935, (TString)(LETd[i-2]+ " keV/#mum"));
 			t->SetNDC(); //set position in coordinate system relative to canvas
 			t->Draw();
 	}
 
-	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/linealSpectra/multigraphJigLinealSpectra.jpg";
+	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/linealSpectra/multigraphJigLinealSpectra2.jpg";
 	c->SaveAs((TString)outputName);
 
 	delete c;

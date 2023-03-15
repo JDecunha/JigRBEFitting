@@ -1,26 +1,19 @@
-#include "BWF_Fitter_AlphaBeta.h"
+#include "AlphaBeta_Fitter.h"
 
-double* BWF_Fitter_AlphaBeta::Fit(double* initialGuess, bool weightedFit)
+double* AlphaBeta_Fitter::Fit(double* initialGuess, bool weightedFit)
 {
 	if(!_paramsSet) {std::cout << "Attempt to use BWF_Fitter_AlphaBeta without setting survival params. Failure." << std::endl; return nullptr; }
-	if(!_alphaFunctionSet) {std::cout << "Attempt to use BWF_Fitter_AlphaBeta without setting  alpha biological weighting function to fit. Failure." << std::endl; return nullptr; }
-	if(!_betaFunctionSet) {std::cout << "Attempt to use BWF_Fitter_AlphaBeta without setting  beta biological weighting function to fit. Failure." << std::endl; return nullptr; }
 
-	return GeneralizedBWFFitting(_survivalParams, _alphaFitFunc, _betaFitFunc, initialGuess, weightedFit);
+	return LQModelFitting(_survivalParams, initialGuess, weightedFit);
 }
 
-int BWF_Fitter_AlphaBeta::GeneralizedBWF(const gsl_vector* x, void* data, gsl_vector* f)
+int AlphaBeta_Fitter::LQModel(const gsl_vector* x, void* data, gsl_vector* f)
 {
-	//Load in the dySpectra and underlying ground truth alpha values
-	const std::vector<std::pair<std::string,TH1D>>* const pDySpectra = &(((CellStudyBWFFittingParameters*)data)->dySpectra);
+	//Load in the surviving fraction, dose, and LET
 	const std::vector<std::vector<double>>* const sf = &(((CellStudyBWFFittingParameters*)data)->survivingFraction);
 	const std::vector<std::vector<double>>* const dose = &(((CellStudyBWFFittingParameters*)data)->dose);
-	//const double* beta = &(((CellStudySurvivalParameters*)data)->beta);
-
-	const BiologicalWeightingFunction* alphaFittingFunction = &(((CellStudyBWFFittingParameters*)data)->alphaFittingFunction);
-	const BiologicalWeightingFunction* betaFittingFunction = &(((CellStudyBWFFittingParameters*)data)->betaFittingFunction);
-	const int nAlphaParams = alphaFittingFunction->GetNumFittingParams(); //this is used to determine the offset in the parameter list, when computing beta
-	const int nParams = (alphaFittingFunction->GetNumFittingParams()+betaFittingFunction->GetNumFittingParams()); 
+	const std::vector<double>* const LETds = &(((CellStudyBWFFittingParameters*)data)->LETd);
+	const int nParams = ((*LETds).size()*2);
 
 	double params[nParams];
 
@@ -36,33 +29,17 @@ int BWF_Fitter_AlphaBeta::GeneralizedBWF(const gsl_vector* x, void* data, gsl_ve
 	int l = 0; //To keep track of just which LET we are on
 
 
-	for(const std::pair<std::string,TH1D>& spectrumPair:*pDySpectra) //First we iterate over each of the lineal energy spectra
+	for(double LETd:*LETds) //First we iterate over each LET
 	{
-		const TH1D& dySpectrum = std::get<1>(spectrumPair); //Pulling a reference so we don't remake this object
-		double alphaPredicted = 0;
-		double betaPredicted = 0;
-
-		for(int k = 1; k <= dySpectrum.GetNbinsX(); ++k) //Iterate over every histogram bin to calculate alpha
-		{
-			//Get the spectrum value
-			double width = dySpectrum.GetBinWidth(k);
-			double center = dySpectrum.GetBinCenter(k);
-			double value = dySpectrum.GetBinContent(k);
-
-			//Accumulate the predicted value of alpha as we integrate the function
-			double ryAlphaVal = alphaFittingFunction->GetValue(params,center);
-			alphaPredicted += ryAlphaVal*value*width; //value*width is d(y)*dy, and everything else is r(y)
-
-			double ryBetaVal = betaFittingFunction->GetValue(&(params[nAlphaParams]), center);
-			betaPredicted += ryBetaVal*value*width;
-		}
 
 		for (int j = 0; j < (*dose)[l].size(); ++j) //Iterate over every different dose level and determine surviving faction
 		{	
 			double survivalPredicted = 0; 
+			double alpha = params[2*l]; //starts at 0, increments by 2
+			double beta = params[2*l+1]; //starts at 1, increments by 1
 
 			//calculate the exponent of survival predicted
-			survivalPredicted = (alphaPredicted*(((*dose)[l])[j]))+((betaPredicted)*(((*dose)[l])[j])*(((*dose)[l])[j]));
+			survivalPredicted = (alpha*(((*dose)[l])[j]))+((beta)*(((*dose)[l])[j])*(((*dose)[l])[j]));
 			//take e^exponent
 			survivalPredicted = std::exp(-survivalPredicted);
 
@@ -77,10 +54,8 @@ int BWF_Fitter_AlphaBeta::GeneralizedBWF(const gsl_vector* x, void* data, gsl_ve
 	return GSL_SUCCESS;
 }
 
-double* BWF_Fitter_AlphaBeta::GeneralizedBWFFitting(CellStudyBWFFittingParameters& survivalParams, BiologicalWeightingFunction fitFuncAlpha, BiologicalWeightingFunction fitFuncBeta, double* initialGuess, bool weightedFit)
+double* AlphaBeta_Fitter::LQModelFitting(CellStudyBWFFittingParameters& survivalParams, double* initialGuess, bool weightedFit)
 {
-	survivalParams.alphaFittingFunction = fitFuncAlpha;
-	survivalParams.betaFittingFunction = fitFuncBeta;
 
 	//Setting up the fitting algorithm
 	const gsl_multifit_nlinear_type *T = gsl_multifit_nlinear_trust;
@@ -96,7 +71,8 @@ double* BWF_Fitter_AlphaBeta::GeneralizedBWFFitting(CellStudyBWFFittingParameter
 	const double gtol = 1e-8;
 	const double ftol = 0.0;
     const size_t nDataPoints = survivalParams.GetNumDataPoints();
-    int nFittingParams = (fitFuncAlpha.GetNumFittingParams()+fitFuncBeta.GetNumFittingParams());
+    std::vector<double> LETds = survivalParams.LETd;
+    int nFittingParams = ((LETds).size()*2);
 
   	//Set some initial values
   	int status, info;
@@ -152,7 +128,7 @@ double* BWF_Fitter_AlphaBeta::GeneralizedBWFFitting(CellStudyBWFFittingParameter
 
 
 	//Define function for minimization
-	fdf.f = GeneralizedBWF;
+	fdf.f = LQModel;
 	fdf.df = NULL;  //Not calculating the Jacobian explicitly
 	fdf.fvv = NULL; //No geodesic acceleration
 	fdf.n = nDataPoints; 

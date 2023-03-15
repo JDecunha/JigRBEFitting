@@ -11,6 +11,9 @@ include("${ROOT_USE_FILE}") #include the ROOT CMakelists which defines $ROOT_LIB
 ### Find GNU Scientific Library
 find_package(GSL REQUIRED)   
 
+### Find Google Ceres Fitting library
+find_package(Ceres REQUIRED)
+
 ### Configure executable
 add_executable(JigRBE JigRBEFitting.cc)
 

@@ -34,6 +34,8 @@ namespace LinealSpectra
 	//Related to the KE weighted lineal energy spectra. For the different locations in the jig.
 
 		//Get the lineal energy for each of Fada's cell samples
+		std::vector<std::pair<std::string,TH1D>> GetKeWeightedFrequencyLinealSpectra(std::string targetSize);
+		//This is for dose spectra
 		std::vector<std::pair<std::string,TH1D>> GetKeWeightedLinealSpectra(std::string targetSize);
 		
 		//Plot the weighted lineal energy spectra on a multigraph

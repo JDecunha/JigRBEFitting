@@ -21,13 +21,13 @@
 #include "NonLinearLeastSquaresUtilities.h"
 
 
-class BWF_Fitter_AlphaBeta
+class LET_Fitter
 {
 	public:
 
 		//Functions to set up the fitter
-		void SetAlphaWeightingFunction(BiologicalWeightingFunction fitFunc) {_alphaFitFunc = fitFunc; _alphaFunctionSet = true; };
-		void SetBetaWeightingFunction(BiologicalWeightingFunction fitFunc) {_betaFitFunc = fitFunc; _betaFunctionSet = true; };
+		void SetAlphaFunction(BiologicalWeightingFunction fitFunc) {_alphaFitFunc = fitFunc; _alphaFunctionSet = true; };
+		void SetBetaFunction(BiologicalWeightingFunction fitFunc) {_betaFitFunc = fitFunc; _betaFunctionSet = true; };
 		void SetCellStudyParameters(CellStudyBWFFittingParameters survivalParams) {_survivalParams=survivalParams; _paramsSet = true; };
 
 		//Public interface to start the fit
@@ -36,8 +36,8 @@ class BWF_Fitter_AlphaBeta
 	private:
 
 		//Internal functions to conduct the fitting
-		static int GeneralizedBWF(const gsl_vector* x, void* data, gsl_vector* f);
-		static double* GeneralizedBWFFitting(CellStudyBWFFittingParameters& survivalParams, BiologicalWeightingFunction fitFuncAlpha, BiologicalWeightingFunction fitFuncBeta, double* initialGuess, bool weightedFit);
+		static int GeneralizedLETModel(const gsl_vector* x, void* data, gsl_vector* f);
+		static double* GeneralizedLETFitting(CellStudyBWFFittingParameters& survivalParams, BiologicalWeightingFunction fitFuncAlpha, BiologicalWeightingFunction fitFuncBeta, double* initialGuess, bool weightedFit);
 
 		//The fitter owns its survival parameters and fitting function
 		CellStudyBWFFittingParameters _survivalParams{};

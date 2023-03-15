@@ -86,6 +86,78 @@ std::string Utilities::GetFileTargetSize(std::string filename)
 	return "failure :(";
 }
 
+double Utilities::GetYD(TH1* h)
+{
+	//Input: takes a normalized d(y) function
+	//In future: to get uncertainty out of these for the positions on the jig will require some calculations
+	//To figure out how to propagate all the uncertainties.
+
+	double normalization = 0;
+	double yd = 0;
+	int length = h->GetNbinsX(); //get length
+
+	//Step 1.) Should be normalized, but we'll double check
+	for (int i = 1; i <= length; i++) 
+	{
+		auto value = h->GetBinContent(i);
+		double low_edge = h->GetBinLowEdge(i);
+		double high_edge = h->GetBinLowEdge(i+1);
+		double width = high_edge-low_edge;
+		normalization += value*width;
+	}
+	for (int i = 1; i <= length; i++) 
+	{
+		auto value = h->GetBinContent(i);
+		auto normalized = value/normalization;
+		h->SetBinContent(i,normalized);
+	}
+
+	//Step 2.) Calculate y_d
+	for (int i = 1; i <= length; i++) 
+	{
+		auto value = h->GetBinContent(i);
+		double low_edge = h->GetBinLowEdge(i);
+		double high_edge = h->GetBinLowEdge(i+1);
+		double y = (high_edge+low_edge)/2;
+		double width = high_edge-low_edge;
+
+		yd += value*width*y;
+	}	
+
+	return yd;
+}
+
+void Utilities::PMF_to_FrequencyFunction(TH1* h)
+{
+	//This converts a probability mass function to a dose-weighted probability density function
+	int length = h->GetNbinsX();
+
+	double normalization = 0;
+
+	for (int i = 1; i <= length; i++) //bins per bin width
+	{
+		double value = h->GetBinContent(i);
+		double low_edge = h->GetBinLowEdge(i);
+		double high_edge = h->GetBinLowEdge(i+1);
+		double bin_middle = (high_edge+low_edge)/double(2);
+		double width = h->GetBinWidth(i);
+		double per_width = bin_middle/(width);
+
+		//This works because each bin value = bin_middle/width now
+		//So integration would be given by bin_middle*width/width
+		normalization += bin_middle;
+		h->SetBinContent(i,per_width);
+	}
+	
+	for (int i = 1; i <= length; i++) //normalize
+	{
+		double value = h->GetBinContent(i);
+		double normalized = value/normalization;
+
+		h->SetBinContent(i,normalized);
+	}
+}
+
 void Utilities::PMF_to_DoseFunction(TH1* h)
 {
 	//This converts a probability mass function to a dose-weighted probability density function
@@ -136,6 +208,33 @@ TH1D Utilities::GetDy(std::string path, double Energy, std::string TargetSize)
 			TFile f = TFile((TString)entry.path());
 			output = std::move(*(TH1D*)f.Get("Lineal energy histogram")); //Move the value pointed to by the TH1D pointer on to the stack
 			PMF_to_DoseFunction(&output); //Transform the N(y) to a d(y)
+			fileFound = true;
+			break;
+		}
+	}
+
+	if (fileFound) { return output; } else {throw std::runtime_error("From Utilities::GetDy. Lineal energy histogram not found.");}
+}
+
+TH1D Utilities::GetFy(std::string path, double Energy, std::string TargetSize)
+{
+	TH1::AddDirectory(false); //So that we own the TH1 and gROOT won't delete it on us
+	TH1D output; //Output histogram
+	bool fileFound = false; //Will throw an exception if we don't find the file
+
+	//We have separated the files into different folders by target size. Specify that path.
+	path = path + "/" + TargetSize + "nm"; 
+
+	for (const auto &entry : std::filesystem::directory_iterator(path)) //Loop over all the files in the folder
+	{
+		double energy = std::stod(GetFileEnergy(entry.path().filename())); //Get the energy of the file
+
+		//Check if the energy is what we requested
+		if (std::fabs(Energy - energy) < 0.000001) //I wish this wasn't necessary. But subtraction of the energies never returns exactly zero
+		{
+			TFile f = TFile((TString)entry.path());
+			output = std::move(*(TH1D*)f.Get("Lineal energy histogram")); //Move the value pointed to by the TH1D pointer on to the stack
+			PMF_to_FrequencyFunction(&output); //Transform the N(y) to a f(y)
 			fileFound = true;
 			break;
 		}

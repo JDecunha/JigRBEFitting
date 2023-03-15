@@ -131,6 +131,58 @@ TH1F ProtonSpectra::GetFadaSpectrumRebinned(const std::string& column)
 	return KE_spectrum_averaged;
 }
 
+TH1F ProtonSpectra::GetFadaKESpectrumRaw(const std::string& column)
+{
+	TH1::AddDirectory(kFALSE); //so that the TH1s don't get added to the global gDirectory by default
+
+	//Part 1.) Read Fada's data in and get it into a TH1F
+
+	//Laod the file into a TTree
+	TTree KEspectra = TTree("T","a collection of proton KE spectra");
+	KEspectra.ReadFile("/home/joseph/Documents/PHD_local/fada_data/protonKEspectra.csv"); //all variables will be floating point
+
+	//Make the TTreeReader
+	TTreeReader treeReader(&KEspectra);
+	TTreeReaderValue<Float_t> KeBin(treeReader,"KE_MeV");
+	TTreeReaderValue<Float_t> KeValue(treeReader,(TString)column);
+
+	//Make a vector to hold the bins
+	std::vector<double> KE_bins;
+
+	//Put the bins into the std::vector
+	while (treeReader.Next()) 
+	{
+		KE_bins.push_back(*KeBin);
+	}
+
+	//Make the TH1F with correct bins, it's currently empty
+	TH1F KE_spectrum = TH1F("KE Spectrum"," ",(KE_bins.size()-1), KE_bins.data());
+	treeReader.Restart(); //Restart the reader so it can run again again
+
+	//Fill the TH1F with values
+	while (treeReader.Next()) 
+	{
+		KE_spectrum.Fill(*KeBin,*KeValue); 
+	}
+ 
+	//Part 2: Normalizing the spectrum (so it adds to 1)
+	float normalization = 0;
+
+	for (int i = 0; i <= KE_spectrum.GetNbinsX(); ++i) //calculate the normalization value
+	{
+		normalization += KE_spectrum.GetBinContent(i);
+	}
+
+	for (int i = 0; i <= KE_spectrum.GetNbinsX(); ++i) //normalize
+	{
+		float normalizedVal = KE_spectrum.GetBinContent(i)/normalization;
+		KE_spectrum.SetBinContent(i,normalizedVal);
+		//std::cout << KE_spectrum_averaged.GetBinCenter(i) << " " << KE_spectrum_averaged.GetBinContent(i) << std::endl;
+	}
+
+	return KE_spectrum;
+}
+
 std::vector<std::pair<std::string,TH1F>> ProtonSpectra::GetFadaSpectraRebinned() //gets all of Fadas spectra and outputs
 {
 	std::vector<std::pair<std::string,TH1F>> output;
@@ -139,6 +191,21 @@ std::vector<std::pair<std::string,TH1F>> ProtonSpectra::GetFadaSpectraRebinned()
 	for (const auto& item:columns)
 	{
 		output.push_back(std::pair<std::string,TH1F>(item, GetFadaSpectrumRebinned(item)));
+	}
+
+	return output;
+}
+
+//This function is called "raw" but it is normalized. It's just not rebinned,
+std::vector<std::pair<std::string,TH1F>> ProtonSpectra::GetFadaKESpectrumRaw() //gets all of Fadas spectra and outputs
+{
+
+	std::vector<std::pair<std::string,TH1F>> output;
+	std::vector<std::string> columns{"a","b","c","d","e","f","g","h","i","j","k","l"};
+
+	for (const auto& item:columns)
+	{
+		output.push_back(std::pair<std::string,TH1F>(item, GetFadaKESpectrumRaw(item)));
 	}
 
 	return output;
