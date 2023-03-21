@@ -19,14 +19,21 @@
 //This project
 #include "ProtonSpectra.h" //Proton KESpectra
 #include "LinealSpectra.h" //Lineal energy spectra from KE Spectra
-//Functions for fitting and plotting
 #include "SurvivalPlotting.h"
-#include "BWF_Fitter.h"
-#include "BWF_Fitter_Beta.h"
+#include "BWF_Fitting_Results.h"
+#include "NonLinearLeastSquaresUtilities.h"
 
+//Functions for fitting and plotting
 
 TGraph* BWFFunctionPlotter(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, BiologicalWeightingFunction fittingFunction, double* fitFuncParams, std::string options, double minLineal = 0, double maxLineal = 250);
+void GeneralizedBWFMultigraphPlotter(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BWF_Fitting_Results results, double* fitFuncParams,  double minDose = 0, double maxDose = 5.75);
+void AlphaBetaMultigraphResiduals(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BWF_Fitting_Results results,  double minDose = 0, double maxDose = 5.75);
 
+
+
+//
+// Depreceated
+//
 void GeneralizedBWFMultigraphPlotter(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudySurvivalParameters& survivalParams, BiologicalWeightingFunction fittingFunction, double* fitFuncParams,  double minDose = 0, double maxDose = 5.75);
 void GeneralizedBWFMultigraphPlotterBeta(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudySurvivalParameters& survivalParams, BiologicalWeightingFunction fittingFunction, double* fitFuncParams,  double minDose = 0, double maxDose = 5.75);
 void GeneralizedBWFMultigraphPlotterAlphaBeta(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BiologicalWeightingFunction alphaFittingFunction, BiologicalWeightingFunction betaFittingFunction, double* fitFuncParams,  double minDose = 0, double maxDose = 5.75);

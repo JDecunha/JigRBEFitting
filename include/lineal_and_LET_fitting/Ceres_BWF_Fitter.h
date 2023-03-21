@@ -14,6 +14,7 @@
 //This project
 #include "BiologicalWeightingFunction.h"
 #include "NonLinearLeastSquaresUtilities.h"
+#include "BWF_Fitting_Results.h"
 
 
 class Ceres_BWF_Fitter
@@ -25,8 +26,28 @@ class Ceres_BWF_Fitter
 		void SetBetaWeightingFunction(BiologicalWeightingFunction fitFunc) {_betaFitFunc = fitFunc; _betaFunctionSet = true; };
 		void SetCellStudyParameters(CellStudyBWFFittingParameters survivalParams) {_survivalParams=survivalParams; _paramsSet = true; };
 
+		//Functions to set a lower constraint on fitting parameters in the alpha and beta functions
+		void SetAlphaParameterLowerConstraint(int index, double constraint);
+		void SetBetaParameterLowerConstraint(int index, double constraint);
+
+		//Function to set ceres::Solver::Options with a user defined version rather than default
+		void SetFittingOptions(ceres::Solver::Options const& options) {_options=options; _optionsSet = true; };
+
+		//These functions became necessary when we started passing constraints to the fitter
+		//We need to initialize the problem before setting the constraints
+		void Initialize() 
+		{ 
+			if(!_paramsSet) {std::cout << "Attempt to use Ceres_BWF_Fitter without setting survival params. Failure." << std::endl; throw; }
+			if(!_alphaFunctionSet) {std::cout << "Attempt to use Ceres_BWF_Fitter without setting  alpha biological weighting function to fit. Failure." << std::endl; throw; }
+			if(!_betaFunctionSet) {std::cout << "Attempt to use Ceres_BWF_Fitter without setting  beta biological weighting function to fit. Failure." << std::endl; throw; }
+			_problem = ceres::Problem(); SetupResidualBlocks(); _initialized = true; _alreadyRun = false; 
+		};
+
+		//Right now reset isn't used for anything.
+		// void Reset() { _problem = ceres::Problem(); _initialized = true; _alreadyRun = false; };
+
 		//Public interface to start the fit
-		void Fit(); 
+		BWF_Fitting_Results Fit(); 
 
 	private:
 
@@ -85,10 +106,43 @@ class Ceres_BWF_Fitter
 		CellStudyBWFFittingParameters _survivalParams{};
 		BiologicalWeightingFunction _alphaFitFunc{};
 		BiologicalWeightingFunction _betaFitFunc{};
+
+		//The fitter owns the problem it solves, the options associated with it, and the results of the last fit
 		ceres::Problem _problem{};
+		ceres::Solver::Options _options;
+		BWF_Fitting_Results results{};
 
 		//Flags
 		bool _paramsSet{false};
 		bool _alphaFunctionSet{false};
 		bool _betaFunctionSet{false};
+		bool _optionsSet{false};
+		bool _initialized{false};
+		bool _alreadyRun{false};
+};
+
+
+
+class Ceres_BWF_Fitting_Callback : public ceres::IterationCallback 
+{
+	public:
+		explicit Ceres_BWF_Fitting_Callback(BiologicalWeightingFunction* alphaFunc, BiologicalWeightingFunction* betaFunc) 
+		: _pAlphaFunc(alphaFunc), _pBetaFunc(betaFunc)
+		{}
+		
+		~Ceres_BWF_Fitting_Callback() {}
+
+		ceres::CallbackReturnType operator() (const ceres::IterationSummary& summary) 
+		{
+			std::cout << "Iteration #: " << summary.iteration;
+			std::cout << " Alpha: "; _pAlphaFunc->PrintFitParams();
+			std::cout << " Beta: "; _pBetaFunc->PrintFitParams();
+			std::cout << std::endl;
+
+			return ceres::SOLVER_CONTINUE;
+		}
+
+	private:
+		BiologicalWeightingFunction* _pAlphaFunc;
+		BiologicalWeightingFunction* _pBetaFunc;
 };

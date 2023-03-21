@@ -1,12 +1,12 @@
 #include "Ceres_BWF_Fitter.h"
 
-void Ceres_BWF_Fitter::Fit()
-{
-	if(!_paramsSet) {std::cout << "Attempt to use Ceres_BWF_Fitter without setting survival params. Failure." << std::endl; return; }
-	if(!_alphaFunctionSet) {std::cout << "Attempt to use Ceres_BWF_Fitter without setting  alpha biological weighting function to fit. Failure." << std::endl; return; }
-	if(!_betaFunctionSet) {std::cout << "Attempt to use Ceres_BWF_Fitter without setting  beta biological weighting function to fit. Failure." << std::endl; return; }
 
+
+BWF_Fitting_Results Ceres_BWF_Fitter::Fit()
+{
 	GeneralizedBWFFitting();
+
+	return results;
 }
 
 void Ceres_BWF_Fitter::SetupResidualBlocks()
@@ -39,15 +39,37 @@ void Ceres_BWF_Fitter::SetupResidualBlocks()
 }
 
 void Ceres_BWF_Fitter::GeneralizedBWFFitting()
-{
-	SetupResidualBlocks();
-
-	// Run the solver!
+{	
+	//If user has specified options, use them, if not use defaults
 	ceres::Solver::Options options;
-	options.linear_solver_type = ceres::DENSE_QR;
-	options.minimizer_progress_to_stdout = true;
+	if (_optionsSet) {options = _options;}
+	else 
+	{	
+		options.linear_solver_type = ceres::DENSE_QR;
+		options.minimizer_progress_to_stdout = false;
+
+		//Add the callback
+		Ceres_BWF_Fitting_Callback callback(&_alphaFitFunc, &_betaFitFunc);
+		options.callbacks.push_back(&callback);
+		options.update_state_every_iteration = true;
+	}
+
 	ceres::Solver::Summary summary;
 	ceres::Solve(options, &_problem, &summary);
 
-	std::cout << summary.BriefReport() << "\n";
+	results.alphaFunc = _alphaFitFunc;
+	results.betaFunc = _betaFitFunc;
+	results.summary = summary;
+
+	_alreadyRun = true; //Set the flag to indicate the fitter has run
+}
+
+void Ceres_BWF_Fitter::SetAlphaParameterLowerConstraint(int index, double constraint)
+{
+	_problem.SetParameterLowerBound(_alphaFitFunc.GetFittingParams(),index, constraint);
+}
+
+void Ceres_BWF_Fitter::SetBetaParameterLowerConstraint(int index, double constraint)
+{
+	_problem.SetParameterLowerBound(_betaFitFunc.GetFittingParams(),index, constraint);
 }

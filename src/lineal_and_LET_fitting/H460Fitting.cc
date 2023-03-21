@@ -39,7 +39,7 @@
 //I put the survival parameters at global scope
 // CellStudySurvivalParameters H460Params{};
 //The version below works with having a BWF for beta too.
-extern CellStudyBWFFittingParameters H460FittingParamsNewAndImproved;
+extern CellStudyBWFFittingParameters H460FittingParams;
 
 // void BetaFromPhotonFitting()
 // {
@@ -409,7 +409,7 @@ void FixedBetaFitting()
 
 	//Set up the fitter
 	BWF_Fitter_AlphaBeta fitter{};
-	fitter.SetCellStudyParameters(H460FittingParamsNewAndImproved);
+	fitter.SetCellStudyParameters(H460FittingParams);
 
 	//Create fixed "BWF"
 	BiologicalWeightingFunction FixedBWF;

@@ -4,5 +4,9 @@ void BiologicalWeightingFunction::SetWeightingFunction(double (*BWF)(double cons
 {
 	_pBWF = BWF;
 	_nFittingParams = nParams;
-	_params = new double [_nFittingParams](); //parentheses are important, there zero initialize the array
+
+	for (int i = 0; i < nParams; ++i)
+	{
+		_params.push_back(0);
+	}
 }
