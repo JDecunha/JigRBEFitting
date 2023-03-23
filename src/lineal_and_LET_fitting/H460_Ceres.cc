@@ -2619,8 +2619,9 @@ void Fifth_Beta()
 	TAttLine lineStyle{};
 	lineStyle.SetLineWidth(5);
 	lineStyle.SetLineStyle(1);
-	
-	lineStyle.SetLineColor(kPink+2);
+	lineStyle.SetLineColor(kGreen+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", FifthBWF, fifthResults.alphaFunc.GetFittingParams(), "AL", 0., 100.);
+	// lineStyle.SetLineColor(kPink+2);
 	BWFFunctionPlotter(c, legend, lineStyle, "", CubicBWF, cubicResults.alphaFunc.GetFittingParams(), "AL", 0., 100.);
 	lineStyle.SetLineColor(kBlue+2);
 	BWFFunctionPlotter(c, legend, lineStyle, "", FourthBWF, fourthResults.alphaFunc.GetFittingParams(), "L", 0., 100.);
@@ -2628,8 +2629,6 @@ void Fifth_Beta()
 	BWFFunctionPlotter(c, legend, lineStyle, "", LinearBWF, linearResults.alphaFunc.GetFittingParams(), "L", 0., 100.);
 	lineStyle.SetLineColor(kOrange+2);
 	BWFFunctionPlotter(c, legend, lineStyle, "", QuadraticBWF, quadraticResults.alphaFunc.GetFittingParams(), "L", 0., 100.);
-	lineStyle.SetLineColor(kGreen+2);
-	BWFFunctionPlotter(c, legend, lineStyle, "", FifthBWF, fifthResults.alphaFunc.GetFittingParams(), "L", 0., 100.);
 
 	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/polynomialhalpha_CERES_BWFs_betaFifth.jpg";
 	c->SaveAs((TString)outputName); 

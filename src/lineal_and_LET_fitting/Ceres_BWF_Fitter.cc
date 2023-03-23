@@ -21,16 +21,35 @@ void Ceres_BWF_Fitter::SetupResidualBlocks()
 		{	
 
 			//Construct the cost function with the Dose, SF, dy spectrum, and fitting functions
-			ceres::DynamicNumericDiffCostFunction<Generalized_BWF_Residual>* costFunc = new ceres::DynamicNumericDiffCostFunction<Generalized_BWF_Residual>
-				(new Generalized_BWF_Residual(_survivalParams.dose[l][j], _survivalParams.survivingFraction[l][j], dySpectrum, _alphaFitFunc, _betaFitFunc));
+			if (_positiveConstrained)
+			{
+				ceres::DynamicNumericDiffCostFunction<Generalized_BWF_Residual_Positive_Constrained>* costFunc = new ceres::DynamicNumericDiffCostFunction<Generalized_BWF_Residual_Positive_Constrained>
+					(new Generalized_BWF_Residual_Positive_Constrained(_survivalParams.dose[l][j], _survivalParams.survivingFraction[l][j], dySpectrum, _alphaFitFunc, _betaFitFunc));
 
-			//Since we constructed a dynamic cost function, we have to tell it the number of parameters
-			costFunc->AddParameterBlock(_alphaFitFunc.GetNumFittingParams());
-			costFunc->AddParameterBlock(_betaFitFunc.GetNumFittingParams());
-			costFunc->SetNumResiduals(1); //Number of residuals is just 1, because 1 SF is calculated at a time
+				//Since we constructed a dynamic cost function, we have to tell it the number of parameters
+				costFunc->AddParameterBlock(_alphaFitFunc.GetNumFittingParams());
+				costFunc->AddParameterBlock(_betaFitFunc.GetNumFittingParams());
+				costFunc->SetNumResiduals(1); //Number of residuals is just 1, because 1 SF is calculated at a time
 
-			//Add a residual block with the alpha and beta BWF Fitting params
-			_problem.AddResidualBlock(costFunc, nullptr, _alphaFitFunc.GetFittingParams(), _betaFitFunc.GetFittingParams()); 
+				//Add a residual block with the alpha and beta BWF Fitting params
+				_problem.AddResidualBlock(costFunc, nullptr, _alphaFitFunc.GetFittingParams(), _betaFitFunc.GetFittingParams()); 
+			}
+			else
+			{
+				ceres::DynamicNumericDiffCostFunction<Generalized_BWF_Residual>* costFunc = new ceres::DynamicNumericDiffCostFunction<Generalized_BWF_Residual>
+					(new Generalized_BWF_Residual(_survivalParams.dose[l][j], _survivalParams.survivingFraction[l][j], dySpectrum, _alphaFitFunc, _betaFitFunc));
+
+				//Since we constructed a dynamic cost function, we have to tell it the number of parameters
+				costFunc->AddParameterBlock(_alphaFitFunc.GetNumFittingParams());
+				costFunc->AddParameterBlock(_betaFitFunc.GetNumFittingParams());
+				costFunc->SetNumResiduals(1); //Number of residuals is just 1, because 1 SF is calculated at a time
+
+				//Add a residual block with the alpha and beta BWF Fitting params
+				_problem.AddResidualBlock(costFunc, nullptr, _alphaFitFunc.GetFittingParams(), _betaFitFunc.GetFittingParams()); 
+			}
+			
+
+
 		}
 
 		++l; //iterate jig positions

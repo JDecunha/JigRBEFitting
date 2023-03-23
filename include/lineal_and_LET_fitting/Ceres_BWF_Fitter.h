@@ -30,6 +30,7 @@ class Ceres_BWF_Fitter
 		void SetAlphaParameterLowerConstraint(int index, double constraint);
 		void SetBetaParameterLowerConstraint(int index, double constraint);
 		void SetAlphaParameterUpperConstraint(int index, double constraint);
+		void SetPositiveConstrained(bool constrained) {_positiveConstrained = constrained;};
 
 
 		//Function to set ceres::Solver::Options with a user defined version rather than default
@@ -100,6 +101,55 @@ class Ceres_BWF_Fitter
 				BiologicalWeightingFunction const _betaFunc;
 		};
 
+		struct Generalized_BWF_Residual_Positive_Constrained
+		{
+			Generalized_BWF_Residual_Positive_Constrained(double dose, double SF, TH1D const& linealSpectrum, BiologicalWeightingFunction const& alphaFunc, BiologicalWeightingFunction const& betaFunc) 
+				: _dose(dose), _SF(SF), _linealSpectrum(linealSpectrum), _alphaFunc(alphaFunc), _betaFunc(betaFunc) 
+			{
+
+			}
+
+			bool operator()(double const* const* parameters, double* residual) const 
+			{
+
+				double alphaPredicted = 0.; double betaPredicted = 0.;
+
+				for(int i = 1; i <= _linealSpectrum.GetNbinsX(); ++i) //Iterate over the lineal energy spectrum
+				{
+					//Get the spectrum value
+					double width = _linealSpectrum.GetBinWidth(i);
+					double center = _linealSpectrum.GetBinCenter(i);
+					double value = _linealSpectrum.GetBinContent(i);
+
+					//Accumulate the predicted value of alpha as we integrate the function
+					double ryAlphaVal = _alphaFunc.GetValue(parameters[0],center);
+					alphaPredicted += ryAlphaVal*value*width; //value*width is d(y)*dy, and everything else is r(y)
+
+					double ryBetaVal = _betaFunc.GetValue(parameters[1], center);
+					betaPredicted += ryBetaVal*value*width;
+					if (ryAlphaVal < 0 || ryBetaVal < 0) {return false;}
+				}
+
+				//calculate SF
+				double survivalPredicted = ( (alphaPredicted*_dose) + (betaPredicted*_dose*_dose) );
+				survivalPredicted = std::exp(-survivalPredicted);
+
+				//Return the residual
+				residual[0] = _SF - survivalPredicted;
+		    	return true;
+		 	}
+
+			private:
+
+				//Everything is const so once a residual block is defined it can't be changed
+				double const _dose;
+				double const _SF;
+				TH1D const& _linealSpectrum;
+				BiologicalWeightingFunction const _alphaFunc;
+				BiologicalWeightingFunction const _betaFunc;
+		};
+
+
 		//Internal functions to conduct the fitting
 		void GeneralizedBWFFitting();
 		void SetupResidualBlocks();
@@ -118,6 +168,7 @@ class Ceres_BWF_Fitter
 		bool _paramsSet{false};
 		bool _alphaFunctionSet{false};
 		bool _betaFunctionSet{false};
+		bool _positiveConstrained{false};
 		bool _optionsSet{false};
 		bool _initialized{false};
 		bool _alreadyRun{false};
