@@ -17,6 +17,7 @@ class BiologicalWeightingFunction
 		};
 
 		double GetValue(double const* inputs, double linealEnergy) const { return _pBWF(inputs,linealEnergy); };
+		double GetValue(double linealEnergy) const { return _pBWF(_params.data(),linealEnergy); };
 		double* GetFittingParams() { return _params.data(); }
 		int GetNumFittingParams() const { return _nFittingParams; };
 

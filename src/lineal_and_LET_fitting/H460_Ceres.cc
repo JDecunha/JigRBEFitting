@@ -23,13 +23,16 @@
 #include "TMath.h"
 
 //This project
-#include "ProtonSpectra.h" //Proton KESpectra
-#include "LinealSpectra.h" //Lineal energy spectra from KE Spectra
+//Proton KESpectra
+#include "ProtonSpectra.h" 
+//Lineal energy spectra from KE Spectra
+#include "LinealSpectra.h" 
 //Functions for fitting and plotting
 #include "SurvivalPlotting.h"
 #include "Ceres_BWF_Fitter.h"
-#include "BWF_Plotter.h"
+#include "AlphaBeta_Fitter.h"
 #include "BWF_Fitting_Results.h"
+#include "BWF_Plotter.h"
 //Ceres Fitter and Google Logging
 #include "ceres/ceres.h"
 #include "glog/logging.h"
@@ -2070,7 +2073,7 @@ void Fourth_Beta()
 
 void Fifth_Beta()
 {
-		SetupH460SurvivalParameters();
+	SetupH460SurvivalParameters();
 
 	//
 	// Creating BWFS
@@ -2160,6 +2163,29 @@ void Fifth_Beta()
 	}
 	, 2);
 
+	//BiologicalWeightingFunction GaussianBWF;
+	BiologicalWeightingFunction GaussianVariableAmplitudeBWF;
+	GaussianVariableAmplitudeBWF.SetWeightingFunction( [] (double const* params, double linealEnergy) 
+	{ 
+		return ((params[0])*std::exp(-((linealEnergy-params[1])*(linealEnergy-params[1]))/(params[2]*params[2]*2))); 
+	}
+	, 3);
+
+	//BiologicalWeightingFunction GaussianBWF;
+	BiologicalWeightingFunction GaussianVariableAmplitudePlusOffsetBWF;
+	GaussianVariableAmplitudePlusOffsetBWF.SetWeightingFunction( [] (double const* params, double linealEnergy) 
+	{ 
+		return (((params[0])*std::exp(-((linealEnergy-params[1])*(linealEnergy-params[1]))/(params[2]*params[2]*2)))+params[3]); 
+	}
+	, 4);
+
+	BiologicalWeightingFunction GaussianPlusOffsetBWF;
+	GaussianPlusOffsetBWF.SetWeightingFunction( [] (double const* params, double linealEnergy) 
+	{ 
+		return (((params[0]/params[2])*std::exp(-((linealEnergy-params[1])*(linealEnergy-params[1]))/(params[2]*params[2]*2)))); 
+	}
+	, 3);
+
 	//Three parameter sigmoid;
 	BiologicalWeightingFunction ThreeParameterSigmoid;
 	ThreeParameterSigmoid.SetWeightingFunction( [] (double const* params, double linealEnergy) 
@@ -2174,6 +2200,42 @@ void Fifth_Beta()
 		return params[0]*((1-std::exp(-linealEnergy*params[1]-params[2]*linealEnergy*linealEnergy-params[3]*linealEnergy*linealEnergy*linealEnergy))/linealEnergy);
 	}, 4);
 
+	BiologicalWeightingFunction MorstinPlusOffsetBWF;
+	MorstinPlusOffsetBWF.SetWeightingFunction([](double const* params, double linealEnergy) 
+	{
+		return (params[0]*((1-std::exp(-linealEnergy*params[1]-params[2]*linealEnergy*linealEnergy-params[3]*linealEnergy*linealEnergy*linealEnergy))/linealEnergy))+params[4];
+	}, 5);
+
+	BiologicalWeightingFunction SkewGaussianBWF;
+	SkewGaussianBWF.SetWeightingFunction( [] (double const* params, double linealEnergy) 
+	{ 
+		//With regards to this wonderful man on the ROOT forums: https://root-forum.cern.ch/t/how-to-fit-a-skew-gaussian/50922/2
+	    double xi = params[0];
+	    double omega = params[1];
+	    double alpha = params[2];
+	    double arg = (linealEnergy - xi) / omega;
+	    double smallphi = TMath::Gaus(arg, 0.0, 1.0, true);
+	    double bigphi = 0.5 * (1 + std::erf(alpha * arg/std::sqrt(2)));
+	    return (2./omega) * smallphi * bigphi;
+	}
+	, 3);
+
+	BiologicalWeightingFunction SkewGaussianVariableAmplitudeBWF;
+	SkewGaussianVariableAmplitudeBWF.SetWeightingFunction( [] (double const* params, double linealEnergy) 
+	{ 
+		//With regards to this wonderful man on the ROOT forums: https://root-forum.cern.ch/t/how-to-fit-a-skew-gaussian/50922/2
+	    double xi = params[0]; //std::cout << "xi: " << xi << std::endl;
+	    double omega = params[1]; ///std::cout << "omega: " << omega << std::endl;
+ 	    double alpha = params[2]; //std::cout << "alpha: " << alpha << std::endl;
+	    double amplitude = params[3]; //std::cout << "amplitude: " << amplitude << std::endl;
+	    double arg = (linealEnergy - xi) / omega;
+	    double smallphi = std::exp(-((linealEnergy-xi)*(linealEnergy-xi))/(params[1]*params[1]*2)); 
+	    // TMath::Gaus(arg, 0.0, 1.0, true);
+	    double bigphi = 0.5 * (1 + std::erf(alpha * arg/std::sqrt(2)));
+
+	    return (2*amplitude) * smallphi * bigphi; //2* is so scale is the same as gaussian
+	}
+	, 4);
 
 	//
 	// The Actual Fitting
@@ -2184,126 +2246,357 @@ void Fifth_Beta()
 		//
 
 	Ceres_BWF_Fitter BWFFitter{};
-	std::cout << "Linear" << std::endl;
+	std::cout << std::endl << "Linear" << std::endl;
 	BWFFitter.SetAlphaWeightingFunction(LinearBWF);
 	// FixedBWF.SetValues(std::vector<double> {0.13}); //Give beta value before passing into the fitter
+	// FifthBWF.SetValues(std::vector<double> {-3.62923e-21, -1.02135e-05, 0.00129381, -0.0357744, 0.220213, -0.107979});
 	BWFFitter.SetBetaWeightingFunction(FifthBWF);
 	BWFFitter.SetCellStudyParameters(H460FittingParams);
 	BWFFitter.Initialize();
+	BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	auto linearResults = BWFFitter.Fit();
 	linearResults.PrintBasic();
+	linearResults.PrintAIC(83);
 
-	std::cout << "Quadratic" << std::endl;
-	QuadraticBWF.SetValues(std::vector<double> {0, 0.0454, 0.0453});
+	std::cout << std::endl << "Quadratic" << std::endl;
+	QuadraticBWF.SetValues(std::vector<double> {0, 0.0139333, 0.127776});
 	BWFFitter.SetAlphaWeightingFunction(QuadraticBWF);
+	FifthBWF.SetValues(std::vector<double> {0, 1.89075e-07, 0, 0, 0, 0.130403});
+	BWFFitter.SetBetaWeightingFunction(FifthBWF);
 	BWFFitter.Initialize();
 	BWFFitter.SetAlphaParameterLowerConstraint(2,0);
 	BWFFitter.SetAlphaParameterLowerConstraint(1,0);
 	BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	auto quadraticResults = BWFFitter.Fit();
 	quadraticResults.PrintBasic();
+	quadraticResults.PrintAIC(83);
 
-	std::cout << "Cubic" << std::endl;
-	CubicBWF.SetValues(std::vector<double> {0, 0.00248214, -0.0583471, 0.275426});
+	std::cout << std::endl << "Cubic" << std::endl;
+	CubicBWF.SetValues(std::vector<double> {0, 0.000873803, 0, 0.151149});
 	BWFFitter.SetAlphaWeightingFunction(CubicBWF);
+	FifthBWF.SetValues(std::vector<double> {0, 5.37076e-08, 3.61649e-07, 0, 0, 0.134576});
+	BWFFitter.SetBetaWeightingFunction(FifthBWF);
 	BWFFitter.Initialize();
 	BWFFitter.SetAlphaParameterLowerConstraint(3,0);
 	BWFFitter.SetAlphaParameterLowerConstraint(2,0);
-	BWFFitter.SetAlphaParameterLowerConstraint(1,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(1,0);
 	BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	auto cubicResults = BWFFitter.Fit();
 	cubicResults.PrintBasic();
+	cubicResults.PrintAIC(83);
 
-	std::cout << "Fourth order polynomial" << std::endl;
-	FourthBWF.SetValues(std::vector<double> {0, 0.000198751, -0.0122275, 0.0654629, 0.110813});
+	std::cout << std::endl << "Fourth order polynomial" << std::endl;
+	FourthBWF.SetValues(std::vector<double> {0, 1.44958e-05, 0, 0, 0.160277});
 	BWFFitter.SetAlphaWeightingFunction(FourthBWF);
+	FifthBWF.SetValues(std::vector<double> {0, 6.2094e-08, 0, 0, 0, 0.135782});
+	BWFFitter.SetBetaWeightingFunction(FifthBWF);
 	BWFFitter.Initialize();
 	BWFFitter.SetAlphaParameterLowerConstraint(4,0);
 	BWFFitter.SetAlphaParameterLowerConstraint(3,0);
 	BWFFitter.SetAlphaParameterLowerConstraint(2,0);
 	BWFFitter.SetAlphaParameterLowerConstraint(1,0);
 	BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	auto fourthResults = BWFFitter.Fit();
 	fourthResults.PrintBasic();
+	fourthResults.PrintAIC(83);
 
 	// The result this converges to, is literally the same as the fourth order result, the first parameter goes to zero
-	std::cout << "Fifth order polynomial" << std::endl;
-	FifthBWF.SetValues(std::vector<double> {0, 1.86239e-05, -0.00178817, 0.0269139, -0.118944, 0.271133});
+	std::cout << std::endl << "Fifth order polynomial" << std::endl;
+	FifthBWF.SetValues(std::vector<double> {0, 0, 1.44943e-05, 0, 0, 0.160252});
 	BWFFitter.SetAlphaWeightingFunction(FifthBWF);
+	FifthBWF.SetValues(std::vector<double> { 0, 6.20455e-08, 0, 0, 0, 0.135764}); //Fifth BWF likes getting zeros for beta, the others don't
+	BWFFitter.SetBetaWeightingFunction(FifthBWF);
 	BWFFitter.Initialize();
+	BWFFitter.SetAlphaParameterLowerConstraint(5,0);
+	BWFFitter.SetAlphaParameterLowerConstraint(4,0);
+	BWFFitter.SetAlphaParameterLowerConstraint(3,0);
+	BWFFitter.SetAlphaParameterLowerConstraint(2,0);
+	BWFFitter.SetAlphaParameterLowerConstraint(1,0);
+	BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	auto fifthResults = BWFFitter.Fit();
 	fifthResults.PrintBasic();
+	fifthResults.PrintAIC(83);
 
 		//
 		// Mairani et al.
 		//
 
-	// std::cout << "Q" << std::endl;
-	// QBWF.SetValues(std::vector<double> {1});
+	// std::cout << std::endl << "Q" << std::endl;
+	// QBWF.SetValues(std::vector<double> {0.0001});
 	// BWFFitter.SetAlphaWeightingFunction(QBWF);
-	// FourthBWF.SetValues(std::vector<double> {0.1,0.1,0.1,0.1,0.1});
-	// BWFFitter.SetBetaWeightingFunction(FourthBWF);
+	// // FifthBWF.SetValues(std::vector<double> {0.1,0.1,0.1,0.1,0.1,0.1});
+	// BWFFitter.SetBetaWeightingFunction(FifthBWF);
 	// BWFFitter.Initialize();
 	// BWFFitter.SetAlphaParameterLowerConstraint(0,0);
-	// // BWFFitter.SetBetaParameterLowerConstraint(0,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// auto QResults = BWFFitter.Fit();
 	// QResults.PrintBasic();
+	// QResults.PrintAIC(83);
 
-	// std::cout << "LE" << std::endl;
-	// LEBWF.SetValues(std::vector<double> {0.3, 0.1});
+	// std::cout << std::endl << "LE" << std::endl;
+	// LEBWF.SetValues(std::vector<double> {0., 0.0139333});
 	// BWFFitter.SetAlphaWeightingFunction(LEBWF);
 	// BWFFitter.Initialize();
-	// BWFFitter.SetAlphaParameterLowerConstraint(1,0);
+	// // BWFFitter.SetAlphaParameterLowerConstraint(1,0);
 	// BWFFitter.SetAlphaParameterLowerConstraint(0,1e-6);
+	// BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// // BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// auto LEResults = BWFFitter.Fit();
 	// LEResults.PrintBasic();
+	// LEResults.PrintAIC(83);
 
-	// std::cout << "QE" << std::endl;
-	// QEBWF.SetValues(std::vector<double> {0.01, 1e-6});
+	// std::cout << std::endl << "QE" << std::endl;
+	// QEBWF.SetValues(std::vector<double> {0.0, 0.000873803});
 	// BWFFitter.SetAlphaWeightingFunction(QEBWF);
 	// BWFFitter.Initialize();
-	// BWFFitter.SetAlphaParameterLowerConstraint(1,-2);
+	// // BWFFitter.SetAlphaParameterLowerConstraint(1,-2);
 	// BWFFitter.SetAlphaParameterLowerConstraint(0,1e-6);
+	// BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// // BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// auto QEResults = BWFFitter.Fit();
 	// QEResults.PrintBasic();
+	// QEResults.PrintAIC(83);
 
-	// std::cout << "LQE" << std::endl;
+	// std::cout << std::endl << "LQE" << std::endl;
+	// LQEBWF.SetValues(std::vector<double> {0.0, 0.000873803, 0.0139333});
 	// BWFFitter.SetAlphaWeightingFunction(LQEBWF); //The ordering is strange, you have to specify the function first
 	// BWFFitter.Initialize(); //then initialize
 	// BWFFitter.SetAlphaParameterLowerConstraint(1,0); //only then can you give the constraints
 	// BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// // BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// auto LQEResults = BWFFitter.Fit();
 	// LQEResults.PrintBasic();
+	// LQEResults.PrintAIC(83);
 
-	// std::cout << "LE2" << std::endl;
+	// std::cout << std::endl << "LE2" << std::endl;
+	// LE2BWF.SetValues(std::vector<double> {0., 0.0139333});
 	// BWFFitter.SetAlphaWeightingFunction(LE2BWF);
 	// BWFFitter.Initialize();
 	// BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// // BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// auto LE2Results = BWFFitter.Fit();
 	// LE2Results.PrintBasic();
+	// LE2Results.PrintAIC(83);
 
-	// std::cout << "QE2" << std::endl;
+	// std::cout << std::endl << "QE2" << std::endl;
+	// QE2BWF.SetValues(std::vector<double> {0.0, 0.000873803});
 	// BWFFitter.SetAlphaWeightingFunction(QE2BWF);
 	// BWFFitter.Initialize();
-	// BWFFitter.SetAlphaParameterLowerConstraint(1,-0.0005);
+	// // BWFFitter.SetAlphaParameterLowerConstraint(1,-0.0005);
 	// BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// // BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// auto QE2Results = BWFFitter.Fit();
 	// QE2Results.PrintBasic();
+	// QE2Results.PrintAIC(83);
 
-	// std::cout << "LQE2" << std::endl;
-	// LQE2BWF.SetValues(std::vector<double> {-0.000256818, -0.000171922, 0.0314693});
+	// std::cout << std::endl << "LQE2" << std::endl;
+	// LQE2BWF.SetValues(std::vector<double> {0.0, 0.000873803, 0.0139333});
 	// BWFFitter.SetAlphaWeightingFunction(LQE2BWF);
 	// BWFFitter.Initialize();
 	// BWFFitter.SetAlphaParameterLowerConstraint(1,0);
 	// BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// // BWFFitter.SetBetaParameterLowerConstraint(0,0);
 	// auto LQE2Results = BWFFitter.Fit();
 	// LQE2Results.PrintBasic();
+	// LQE2Results.PrintAIC(83);
+
+		//
+		//Fitting the other functional forms
+		//
+
+	// std::cout << "Morstin" << std::endl;
+	// MorstinBWF.SetValues(std::vector<double> {2.*std::pow(10,-7), 2.1*std::pow(10,-5), 2.5*std::pow(10,-6), 11460.000000 });
+	// BWFFitter.SetAlphaWeightingFunction(MorstinBWF);
+	// BWFFitter.Initialize();
+	// BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(3,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(2,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(1,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	// auto MorstinResults = BWFFitter.Fit();
+	// MorstinResults.PrintBasic();
+	// MorstinResults.PrintAIC(83);
+
+	// std::cout << "Morstin plus offset" << std::endl;
+	// MorstinPlusOffsetBWF.SetValues(std::vector<double> {0.0, 2.*std::pow(10,-7), 2.1*std::pow(10,-5), 2.5*std::pow(10,-6), 11460.000000});
+	// BWFFitter.SetAlphaWeightingFunction(MorstinPlusOffsetBWF);
+	// FifthBWF.SetValues(std::vector<double> {0, 0, 0, 0, 0, 0});
+	// BWFFitter.SetBetaWeightingFunction(FifthBWF);
+	// BWFFitter.Initialize();
+	// BWFFitter.SetAlphaParameterLowerConstraint(4,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(3,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(2,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(1,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	// auto MorstinOffsetResults = BWFFitter.Fit();
+	// MorstinOffsetResults.PrintBasic();
+	// MorstinOffsetResults.PrintAIC(83);
+
+	// std::cout << "Gaussian" << std::endl;
+	// GaussianVariableAmplitudeBWF.SetValues(std::vector<double> {40, 80, 3});
+	// BWFFitter.SetAlphaWeightingFunction(GaussianVariableAmplitudeBWF);
+	// FifthBWF.SetValues(std::vector<double> {0, 0, 0, 0, 0, 0});
+	// BWFFitter.SetBetaWeightingFunction(FifthBWF);
+	// BWFFitter.Initialize();
+	// BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(0,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(2,1);
+	// BWFFitter.SetAlphaParameterLowerConstraint(1,1);
+	// BWFFitter.SetAlphaParameterLowerConstraint(0,1);
+	// // BWFFitter.SetAlphaParameterUpperConstraint(1,500); 	//Overkill shouldn't happen any later than this.
+	// // BWFFitter.SetAlphaParameterUpperConstraint(0,10000); 	//Prevent runaway amplitude
+	// auto GaussianVarAmplitudeResults = BWFFitter.Fit();
+	// GaussianVarAmplitudeResults.PrintBasic();
+	// GaussianVarAmplitudeResults.PrintAIC(83);
+
+	// std::cout << "Gaussian w Gaussian Beta" << std::endl;
+	// GaussianVariableAmplitudeBWF.SetValues(std::vector<double> {111.38, 517.436, 6975.15});
+	// BWFFitter.SetAlphaWeightingFunction(GaussianVariableAmplitudeBWF);
+	// GaussianVariableAmplitudeBWF.SetValues(std::vector<double> {415.535, 301.313, 0.184074});
+	// BWFFitter.SetBetaWeightingFunction(GaussianVariableAmplitudeBWF);
+	// BWFFitter.Initialize();
+	// BWFFitter.SetAlphaParameterLowerConstraint(2,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(1,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	// BWFFitter.SetBetaParameterLowerConstraint(0,0);
+	// BWFFitter.SetAlphaParameterUpperConstraint(1,500); 	//Overkill shouldn't happen any later than this.
+	// BWFFitter.SetAlphaParameterUpperConstraint(0,10000); 	//Prevent runaway amplitude
+	// auto GaussianGaussianVarAmplitudeResults = BWFFitter.Fit();
+	// GaussianGaussianVarAmplitudeResults.PrintBasic();
+	// GaussianGaussianVarAmplitudeResults.PrintAIC(83);
+
+	// Performs just as bad as the old thing
+	// std::cout << "Gaussian, new thing" << std::endl;
+	// GaussianPlusOffsetBWF.SetValues(std::vector<double> {40, 80, 3});
+	// BWFFitter.SetAlphaWeightingFunction(GaussianPlusOffsetBWF);
+	// FifthBWF.SetValues(std::vector<double> {0, 0, 0, 0, 0, 0});
+	// BWFFitter.SetBetaWeightingFunction(FifthBWF);
+	// BWFFitter.Initialize();
+	// BWFFitter.SetAlphaParameterLowerConstraint(2,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(1,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	// BWFFitter.SetAlphaParameterUpperConstraint(0,1000); 	//Prevent runaway amplitude
+	// auto GaussianNewResults = BWFFitter.Fit();
+	// GaussianNewResults.PrintBasic();
+
+	//Not really getting good or interesting results
+	// std::cout << "Gaussian plus offset" << std::endl;
+	// GaussianVariableAmplitudePlusOffsetBWF.SetValues(std::vector<double> {1, 100, 100, 30});
+	// BWFFitter.SetAlphaWeightingFunction(GaussianVariableAmplitudePlusOffsetBWF);
+	// FifthBWF.SetValues(std::vector<double> {0, 0, 0, 0, 0, 0});
+	// BWFFitter.SetBetaWeightingFunction(FifthBWF);
+	// BWFFitter.Initialize();
+	// //Precent runaway amplitude
+	// BWFFitter.SetAlphaParameterLowerConstraint(3,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(2,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(1,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	// BWFFitter.SetAlphaParameterUpperConstraint(0,1000);
+	// // BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	// // BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	// // BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	// // BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	// // BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	// // BWFFitter.SetBetaParameterLowerConstraint(0,0);
+	// auto GaussianVarAmplitudePlusOffsetResults = BWFFitter.Fit();
+	// GaussianVarAmplitudePlusOffsetResults.PrintBasic();
+
+	// std::cout << "Skew Gaussian" << std::endl;
+	// SkewGaussianVariableAmplitudeBWF.SetValues(std::vector<double> {6, -5, 35, 100}); //SkewGaussianVariableAmplitudeBWF.SetValues(std::vector<double> {3, 0, 40, 80});  initial guess that does someething
+	// BWFFitter.SetAlphaWeightingFunction(SkewGaussianVariableAmplitudeBWF);
+	// // FifthBWF.SetValues(std::vector<double> {0, 0, 0, 0, 1, 0});
+	// BWFFitter.SetBetaWeightingFunction(FifthBWF);
+	// BWFFitter.Initialize();
+	// // BWFFitter.SetAlphaParameterLowerConstraint(2,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(1,0);
+	// BWFFitter.SetAlphaParameterLowerConstraint(0,0);
+	// BWFFitter.SetAlphaParameterUpperConstraint(3,1000); 	//Prevent runaway amplitude
+	// // BWFFitter.SetBetaParameterLowerConstraint(5,0);
+	// // BWFFitter.SetBetaParameterLowerConstraint(4,0);
+	// // BWFFitter.SetBetaParameterLowerConstraint(3,0);
+	// // BWFFitter.SetBetaParameterLowerConstraint(2,0);
+	// // BWFFitter.SetBetaParameterLowerConstraint(1,0);
+	// // BWFFitter.SetBetaParameterLowerConstraint(0,0);
+	// auto SkewGaussianVariableAmplitudeResults = BWFFitter.Fit();
+	// SkewGaussianVariableAmplitudeResults.PrintBasic();
 
 	//
 	// Plotting
@@ -2311,37 +2604,6 @@ void Fifth_Beta()
 
 		//
 		// Plotting the Polynomial BWFs
-		//
-
-	// gStyle->SetOptStat(0); //Don't print the stats window in the top right
-	// TCanvas* c = new TCanvas("c","c");
-	// c->SetCanvasSize(9000, 5000);
-	// c->SetFillStyle(4000);
-	// c->SetFrameFillStyle(4000);
-	// c->Divide(4,3,0.000000005,0.001);
-	// auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
-	// // auto legend = new TLegend(0.14,0.14,0.14+0.33,0.14+0.16);
-	// legend->SetTextSize(0.05);
-
-	// TAttLine lineStyle{};
-	// lineStyle.SetLineWidth(5);
-	// lineStyle.SetLineStyle(1);
-	// lineStyle.SetLineColor(kGreen+2);
-
-	// BWFFunctionPlotter(c, legend, lineStyle, "", CubicBWF, cubicResults.alphaFunc.GetFittingParams(), "AL", 0., 100.);
-	// lineStyle.SetLineColor(kBlue+2);
-	// BWFFunctionPlotter(c, legend, lineStyle, "", FourthBWF, fourthResults.alphaFunc.GetFittingParams(), "L", 0., 100.);
-	// lineStyle.SetLineColor(kRed+2);
-	// BWFFunctionPlotter(c, legend, lineStyle, "", LinearBWF, linearResults.alphaFunc.GetFittingParams(), "L", 0., 100.);
-	// lineStyle.SetLineColor(kOrange+2);
-	// BWFFunctionPlotter(c, legend, lineStyle, "", QuadraticBWF, quadraticResults.alphaFunc.GetFittingParams(), "L", 0., 100.);
-
-	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/polynomial_CERES_BWFs_compto3rdpoly.jpg";
-	// c->SaveAs((TString)outputName); 
-
-
-		//
-		// Plotting the Polynomial Residuals
 		//
 
 	gStyle->SetOptStat(0); //Don't print the stats window in the top right
@@ -2355,28 +2617,45 @@ void Fifth_Beta()
 	legend->SetTextSize(0.05);
 
 	TAttLine lineStyle{};
+	lineStyle.SetLineWidth(5);
+	lineStyle.SetLineStyle(1);
+	
+	lineStyle.SetLineColor(kPink+2);
+	BWFFunctionPlotter(c, legend, lineStyle, "", CubicBWF, cubicResults.alphaFunc.GetFittingParams(), "AL", 0., 100.);
+	lineStyle.SetLineColor(kBlue+2);
+	BWFFunctionPlotter(c, legend, lineStyle, "", FourthBWF, fourthResults.alphaFunc.GetFittingParams(), "L", 0., 100.);
+	lineStyle.SetLineColor(kRed+2);
+	BWFFunctionPlotter(c, legend, lineStyle, "", LinearBWF, linearResults.alphaFunc.GetFittingParams(), "L", 0., 100.);
+	lineStyle.SetLineColor(kOrange+2);
+	BWFFunctionPlotter(c, legend, lineStyle, "", QuadraticBWF, quadraticResults.alphaFunc.GetFittingParams(), "L", 0., 100.);
 	lineStyle.SetLineColor(kGreen+2);
+	BWFFunctionPlotter(c, legend, lineStyle, "", FifthBWF, fifthResults.alphaFunc.GetFittingParams(), "L", 0., 100.);
 
-	AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Linear", H460FittingParams, linearResults);
-	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_linear_fifth.jpg";
+	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/polynomialhalpha_CERES_BWFs_betaFifth.jpg";
 	c->SaveAs((TString)outputName); 
 
-	AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Quadratic", H460FittingParams, quadraticResults);
-	outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_quadratic_fifth.jpg";
-	c->SaveAs((TString)outputName); 
+		//Plotting Beta
 
-	AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Cubic", H460FittingParams, cubicResults);
-	outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_cubic_fifth.jpg";
-	c->SaveAs((TString)outputName); 
+	// gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	// TCanvas* c2 = new TCanvas("c2","c2");
+	// c2->SetCanvasSize(9000, 5000);
+	// c2->SetFillStyle(4000);
+	// c2->SetFrameFillStyle(4000);
+	// c2->Divide(4,3,0.000000005,0.001);
 
-	AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Fourth", H460FittingParams, fourthResults);
-	outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_fourth_fifth.jpg";
-	c->SaveAs((TString)outputName); 
+	// lineStyle.SetLineColor(kGreen+2);
+	// // BWFFunctionPlotter(c, legend, lineStyle, "", FifthBWF, fifthResults.betaFunc.GetFittingParams(), "AL", 0., 100.);
+	// // lineStyle.SetLineColor(kPink+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", FifthBWF, cubicResults.betaFunc.GetFittingParams(), "AL", 0., 100.);
+	// lineStyle.SetLineColor(kBlue+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", FifthBWF, fourthResults.betaFunc.GetFittingParams(), "L", 0., 100.);
+	// lineStyle.SetLineColor(kRed+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", FifthBWF, linearResults.betaFunc.GetFittingParams(), "L", 0., 100.);
+	// lineStyle.SetLineColor(kOrange+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", FifthBWF, quadraticResults.betaFunc.GetFittingParams(), "L", 0., 100.);
 
-	AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Fifth", H460FittingParams, fifthResults);
-	outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_fifth_fifth.jpg";
-	c->SaveAs((TString)outputName); 
-
+	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/polynomialBeta_fifthAlpha_BetaBWFs.jpg";
+	// c2->SaveAs((TString)outputName); 
 
 		//
 		// Plotting the Mairani BWFs
@@ -2411,7 +2690,122 @@ void Fifth_Beta()
 	// lineStyle.SetLineColor(kBlue-8);
 	// BWFFunctionPlotter(c, legend, lineStyle, "", LQE2Results.alphaFunc, LQE2Results.alphaFunc.GetFittingParams(), "L", 0., 100.);
 
-	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/Mairani_BWFs_constrained.jpg";
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/AlphaMairani_BetaFifth.jpg";
+	// c->SaveAs((TString)outputName); 
+
+		//
+		// Beta
+		//
+
+	// gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	// TCanvas* c2 = new TCanvas("c","c");
+	// c2->SetCanvasSize(9000, 5000);
+	// c2->SetFillStyle(4000);
+	// c2->SetFrameFillStyle(4000);
+	// c2->Divide(4,3,0.000000005,0.001);
+
+	// BWFFunctionPlotter(c, legend, lineStyle, "", QResults.betaFunc, QResults.betaFunc.GetFittingParams(), "AL", 0., 100.);
+	// lineStyle.SetLineColor(kBlue+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", LEResults.betaFunc, LEResults.betaFunc.GetFittingParams(), "L", 0., 100.);
+	// lineStyle.SetLineColor(kRed+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", QEResults.betaFunc, QEResults.betaFunc.GetFittingParams(), "L", 0., 100.);
+	// lineStyle.SetLineColor(kOrange+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", LQEResults.betaFunc, LQEResults.betaFunc.GetFittingParams(), "L", 0., 100.);
+	// lineStyle.SetLineColor(kYellow+1);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", LE2Results.betaFunc, LE2Results.betaFunc.GetFittingParams(), "L", 0., 100.);
+	// lineStyle.SetLineColor(kAzure+10);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", QE2Results.betaFunc, QE2Results.betaFunc.GetFittingParams(), "L", 0., 100.);
+	// lineStyle.SetLineColor(kBlue-8);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", LQE2Results.betaFunc, LQE2Results.betaFunc.GetFittingParams(), "L", 0., 100.);
+
+	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/BetaFifth_AlphaMairani.jpg";
+	// c2->SaveAs((TString)outputName); 
+
+		//
+		// Plotting other BWFs
+		//
+
+	// gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	// TCanvas* c = new TCanvas("c","c");
+	// c->SetCanvasSize(9000, 5000);
+	// c->SetFillStyle(4000);
+	// c->SetFrameFillStyle(4000);
+	// c->Divide(4,3,0.000000005,0.001);
+	// auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
+	// // auto legend = new TLegend(0.14,0.14,0.14+0.33,0.14+0.16);
+	// legend->SetTextSize(0.05);
+
+	// TAttLine lineStyle{};
+	// lineStyle.SetLineWidth(5);
+	// lineStyle.SetLineStyle(1);
+
+	// lineStyle.SetLineColor(kGreen+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", MorstinResults.alphaFunc, MorstinResults.alphaFunc.GetFittingParams(), "AL", 0.01, 250.);	
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/Morstin_alpha_to_250.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// lineStyle.SetLineColor(kGreen+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", GaussianVarAmplitudeResults.betaFunc, GaussianVarAmplitudeResults.betaFunc.GetFittingParams(), "AL", 0.01, 110.);	
+	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/Gaussian_beta.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// lineStyle.SetLineColor(kGreen+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", MorstinOffsetResults.alphaFunc, MorstinOffsetResults.alphaFunc.GetFittingParams(), "AL", 0.01, 250.);
+	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/mostinoffset_positive_constrained.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// lineStyle.SetLineColor(kGreen+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", GaussianVarAmplitudeResults.alphaFunc, GaussianVarAmplitudeResults.alphaFunc.GetFittingParams(), "AL", 0.01, 250.);	
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/gaussian_fifth_bwf.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// lineStyle.SetLineColor(kGreen+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", GaussianVarAmplitudePlusOffsetResults.alphaFunc, GaussianVarAmplitudePlusOffsetResults.alphaFunc.GetFittingParams(), "AL", 0.01, 250.);	
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/gaussian_offset_fifth_bwf.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// lineStyle.SetLineColor(kGreen+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", SkewGaussianVariableAmplitudeResults.alphaFunc, SkewGaussianVariableAmplitudeResults.alphaFunc.GetFittingParams(), "AL", 0.01, 100.);	
+	// lineStyle.SetLineColor(kRed+2);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", GaussianVarAmplitudeResults.alphaFunc, GaussianVarAmplitudeResults.alphaFunc.GetFittingParams(), "L", 0.01, 100.);	
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/skew_gaussian_fifth_BWF_0to100.jpg";
+	// c->SaveAs((TString)outputName); 
+
+		//
+		// Plotting the Polynomial Residuals
+		//
+
+	// gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	// TCanvas* c = new TCanvas("c","c");
+	// c->SetCanvasSize(9000, 5000);
+	// c->SetFillStyle(4000);
+	// c->SetFrameFillStyle(4000);
+	// c->Divide(4,3,0.000000005,0.001);
+	// auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
+	// // auto legend = new TLegend(0.14,0.14,0.14+0.33,0.14+0.16);
+	// legend->SetTextSize(0.05);
+
+	// TAttLine lineStyle{};
+	// lineStyle.SetLineColor(kGreen+2);
+
+	// AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Linear", H460FittingParams, linearResults);
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_linear_fifth.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Quadratic", H460FittingParams, quadraticResults);
+	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_quadratic_fifth.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Cubic", H460FittingParams, cubicResults);
+	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_cubic_fifth.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Fourth", H460FittingParams, fourthResults);
+	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_fourth_fifth.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Fifth", H460FittingParams, fifthResults);
+	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_fifth_fifth.jpg";
 	// c->SaveAs((TString)outputName); 
 
 
@@ -2459,9 +2853,181 @@ void Fifth_Beta()
 	// AlphaBetaMultigraphResiduals(c, legend, lineStyle, "LQE2", H460FittingParams, LQE2Results);
 	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_LQE2_fifth.jpg";
 	// c->SaveAs((TString)outputName); 
+
+		//
+		// Plotting the other residuals
+		//
+
+	// gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	// TCanvas* c = new TCanvas("c","c");
+	// c->SetCanvasSize(9000, 5000);
+	// c->SetFillStyle(4000);
+	// c->SetFrameFillStyle(4000);
+	// c->Divide(4,3,0.000000005,0.001);
+	// auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
+	// // auto legend = new TLegend(0.14,0.14,0.14+0.33,0.14+0.16);
+	// legend->SetTextSize(0.05);
+
+	// TAttLine lineStyle{};
+	// lineStyle.SetLineColor(kGreen+2);
+
+	// // AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Morstin", H460FittingParams, MorstinResults);
+	// // std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_morstin_fifth.jpg";
+	// // c->SaveAs((TString)outputName); 
+
+	// // AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Morstin", H460FittingParams, MorstinOffsetResults);
+	// // outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_morstinoffset_fifth.jpg";
+	// // c->SaveAs((TString)outputName); 
+
+	// AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Gaussian", H460FittingParams, GaussianVarAmplitudeResults);
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_gaussian_fifth.jpg";
+	// c->SaveAs((TString)outputName); 
+
+
+
+		//
+		// Plotting Alpha and Beta Compared to direct fitting
+		//
+
+	// AlphaBeta_Fitter fitter{};
+	// fitter.SetCellStudyParameters(H460FittingParams);
+	// double* AlphaBeta = fitter.Fit(nullptr,false);
+
+	// gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	// TCanvas* c = new TCanvas("c","c");
+	// c->SetCanvasSize(9000, 5000);
+	// c->SetFillStyle(4000);
+	// c->SetFrameFillStyle(4000);
+	// auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
+	// // auto legend = new TLegend(0.14,0.14,0.14+0.33,0.14+0.16);
+	// legend->SetTextSize(0.05);
+	// TAttMarker markerAtts;
+	// markerAtts.SetMarkerColor(kBlack);
+	// markerAtts.SetMarkerSize(8);
+	// markerAtts.SetMarkerStyle(8);
+
+	// PlotAlphaBeta(c, legend, "", markerAtts, "AP", H460FittingParams, AlphaBeta, false);
+	// markerAtts.SetMarkerColor(kRed+2);
+	// PlotAlphaBetaFromBWF(c, legend, "", markerAtts, "P", H460FittingParams, GaussianVarAmplitudeResults, false);
+	// // markerAtts.SetMarkerColor(kGreen+2);
+	// // PlotAlphaBetaFromBWF(c, legend, "", markerAtts, "P", H460FittingParams, MorstinResults, false);
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/gaussian_fifth_alpha.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// c->Clear();
+	// legend->Clear();
+
+	// markerAtts.SetMarkerColor(kBlack);
+	// PlotAlphaBeta(c, legend, "", markerAtts, "AP", H460FittingParams, AlphaBeta, true);
+	// markerAtts.SetMarkerColor(kRed+2);
+	// PlotAlphaBetaFromBWF(c, legend, "", markerAtts, "P", H460FittingParams, GaussianVarAmplitudeResults, true);
+	// // markerAtts.SetMarkerColor(kRed+2);
+	// // PlotAlphaBeta(c, legend, "", markerAtts, "P", H460FittingParams, AlphaBeta, true);
+	// // markerAtts.SetMarkerColor(kGreen+2);
+	// // PlotAlphaBetaFromBWF(c, legend, "", markerAtts, "P", H460FittingParams, MorstinResults, true);
+
+	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/gaussian_fifth_beta.jpg";
+	// c->SaveAs((TString)outputName); 
+}
+
+void Survival_Fitting()
+{
+	SetupH460SurvivalParameters();
+
+	AlphaBeta_Fitter fitter{};
+	fitter.SetCellStudyParameters(H460FittingParams);
+	double* AlphaBeta = fitter.Fit(nullptr,false);
+
+	gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	TCanvas* c = new TCanvas("c","c");
+	c->SetCanvasSize(9000, 5000);
+	c->SetFillStyle(4000);
+	c->SetFrameFillStyle(4000);
+	c->Divide(4,3,0.000000005,0.001);
+	auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
+	// auto legend = new TLegend(0.14,0.14,0.14+0.33,0.14+0.16);
+	legend->SetTextSize(0.05);
+
+	TAttMarker markerAtts;
+	markerAtts.SetMarkerColor(kRed+2);
+	markerAtts.SetMarkerSize(8);
+	markerAtts.SetMarkerStyle(8);
+
+	PlotAlphaBeta(c, legend, "", markerAtts, "AP", H460FittingParams, AlphaBeta, false);
+	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/alpha_H460.jpg";
+	c->SaveAs((TString)outputName); 
+
+	PlotAlphaBeta(c, legend, "", markerAtts, "AP", H460FittingParams, AlphaBeta, true);
+	outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/beta_H460.jpg";
+	c->SaveAs((TString)outputName); 
+}
+
+void Skew_Gaussian_Testing()
+{
+	BiologicalWeightingFunction SkewGaussianBWF;
+	SkewGaussianBWF.SetWeightingFunction( [] (double const* params, double linealEnergy) 
+	{ 
+		//With regards to this wonderful man on the ROOT forums: https://root-forum.cern.ch/t/how-to-fit-a-skew-gaussian/50922/2
+	    double xi = params[0]; //std::cout << "xi: " << xi << std::endl;
+	    double omega = params[1]; ///std::cout << "omega: " << omega << std::endl;
+ 	    double alpha = params[2]; //std::cout << "alpha: " << alpha << std::endl;
+	    double amplitude = params[3]; //std::cout << "amplitude: " << amplitude << std::endl;
+	    double arg = (linealEnergy - xi) / omega;
+	    double smallphi = std::exp(-((linealEnergy-xi)*(linealEnergy-xi))/(params[1]*params[1]*2)); 
+	    // TMath::Gaus(arg, 0.0, 1.0, true);
+	    double bigphi = 0.5 * (1 + std::erf(alpha * arg/std::sqrt(2)));
+
+	    return (2*amplitude) * smallphi * bigphi; //2* is so scale is the same as gaussian
+	}
+	, 4);
+
+	BiologicalWeightingFunction GaussianVariableAmplitudeBWF;
+	GaussianVariableAmplitudeBWF.SetWeightingFunction( [] (double const* params, double linealEnergy) 
+	{ 
+		return ((params[0])*std::exp(-((linealEnergy-params[1])*(linealEnergy-params[1]))/(params[2]*params[2]*2))); 
+
+	}
+	, 3);
+
+	// BiologicalWeightingFunction GaussianVariableAmplitudeBWF;
+	// GaussianVariableAmplitudeBWF.SetWeightingFunction( [] (double const* params, double linealEnergy) 
+	// { 
+	// 	// return ((params[0])*std::exp(-((linealEnergy-params[1])*(linealEnergy-params[1]))/(params[2]*params[2]*2))); 
+	// 	return ((params[0])*std::exp(-(1./2.)*((linealEnergy-params[1])/params[2])*((linealEnergy-params[1])/params[2])));
+	// }
+	// , 3);
+
+
+	//Manually set BWF values
+	GaussianVariableAmplitudeBWF.SetValues(std::vector<double> {88.1875, 372.485, 1000});
+	SkewGaussianBWF.SetValues(std::vector<double> {8, -15, 35, 130}); //Param[0] 
+
+	gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	TCanvas* c = new TCanvas("c","c");
+	c->SetCanvasSize(9000, 5000);
+	c->SetFillStyle(4000);
+	c->SetFrameFillStyle(4000);
+	c->Divide(4,3,0.000000005,0.001);
+	auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
+	// auto legend = new TLegend(0.14,0.14,0.14+0.33,0.14+0.16);
+	legend->SetTextSize(0.05);
+
+	TAttLine lineStyle{};
+	lineStyle.SetLineWidth(5);
+	lineStyle.SetLineStyle(1);
+
+
+	lineStyle.SetLineColor(kGreen+2);
+	BWFFunctionPlotter(c, legend, lineStyle, "", SkewGaussianBWF, SkewGaussianBWF.GetFittingParams(), "AL", 0.01, 250.);	
+	lineStyle.SetLineColor(kPink+2);
+	lineStyle.SetLineWidth(12);
+	BWFFunctionPlotter(c, legend, lineStyle, "", GaussianVariableAmplitudeBWF, GaussianVariableAmplitudeBWF.GetFittingParams(), "L", 0.01, 250.);	
+	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/testing_gaussian_fits.jpg";
+	c->SaveAs((TString)outputName); 
 }
 
 void H460_Ceres()
 {
 	Fifth_Beta();
+	// Survival_Fitting();
 }

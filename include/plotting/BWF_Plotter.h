@@ -24,12 +24,9 @@
 #include "NonLinearLeastSquaresUtilities.h"
 
 //Functions for fitting and plotting
-
 TGraph* BWFFunctionPlotter(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, BiologicalWeightingFunction fittingFunction, double* fitFuncParams, std::string options, double minLineal = 0, double maxLineal = 250);
 void GeneralizedBWFMultigraphPlotter(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BWF_Fitting_Results results, double* fitFuncParams,  double minDose = 0, double maxDose = 5.75);
 void AlphaBetaMultigraphResiduals(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BWF_Fitting_Results results,  double minDose = 0, double maxDose = 5.75);
-
-
 
 //
 // Depreceated

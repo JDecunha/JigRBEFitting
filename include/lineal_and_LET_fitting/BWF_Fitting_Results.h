@@ -12,4 +12,5 @@ class BWF_Fitting_Results
 
 		void PrintSummary();
 		void PrintBasic();
+		void PrintAIC(int const& numObservations);
 };

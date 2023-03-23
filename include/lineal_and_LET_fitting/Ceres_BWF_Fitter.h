@@ -26,9 +26,11 @@ class Ceres_BWF_Fitter
 		void SetBetaWeightingFunction(BiologicalWeightingFunction fitFunc) {_betaFitFunc = fitFunc; _betaFunctionSet = true; };
 		void SetCellStudyParameters(CellStudyBWFFittingParameters survivalParams) {_survivalParams=survivalParams; _paramsSet = true; };
 
-		//Functions to set a lower constraint on fitting parameters in the alpha and beta functions
+		//Functions to set constraints on fitting parameters in the alpha and beta functions
 		void SetAlphaParameterLowerConstraint(int index, double constraint);
 		void SetBetaParameterLowerConstraint(int index, double constraint);
+		void SetAlphaParameterUpperConstraint(int index, double constraint);
+
 
 		//Function to set ceres::Solver::Options with a user defined version rather than default
 		void SetFittingOptions(ceres::Solver::Options const& options) {_options=options; _optionsSet = true; };
@@ -134,9 +136,9 @@ class Ceres_BWF_Fitting_Callback : public ceres::IterationCallback
 
 		ceres::CallbackReturnType operator() (const ceres::IterationSummary& summary) 
 		{
-			std::cout << "Iteration #: " << summary.iteration;
-			std::cout << " Alpha: "; _pAlphaFunc->PrintFitParams();
-			std::cout << " Beta: "; _pBetaFunc->PrintFitParams();
+			std::cout << "\u001b[31m\e[1mIteration #: \e[0m\u001b[0m" << summary.iteration;
+			std::cout << "\u001b[34m\e[1m Alpha: \e[0m\u001b[0m"; _pAlphaFunc->PrintFitParams();
+			std::cout << "\u001b[34m\e[1m  Beta: \e[0m\u001b[0m"; _pBetaFunc->PrintFitParams();
 			std::cout << std::endl;
 
 			return ceres::SOLVER_CONTINUE;

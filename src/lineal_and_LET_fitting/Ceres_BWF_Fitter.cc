@@ -69,6 +69,11 @@ void Ceres_BWF_Fitter::SetAlphaParameterLowerConstraint(int index, double constr
 	_problem.SetParameterLowerBound(_alphaFitFunc.GetFittingParams(),index, constraint);
 }
 
+void Ceres_BWF_Fitter::SetAlphaParameterUpperConstraint(int index, double constraint)
+{
+	_problem.SetParameterUpperBound(_alphaFitFunc.GetFittingParams(),index, constraint);
+}
+
 void Ceres_BWF_Fitter::SetBetaParameterLowerConstraint(int index, double constraint)
 {
 	_problem.SetParameterLowerBound(_betaFitFunc.GetFittingParams(),index, constraint);

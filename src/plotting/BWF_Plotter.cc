@@ -643,6 +643,7 @@ TGraph* BWFFunctionPlotter(TCanvas* c, TLegend* legend, const TAttLine& lineAttr
 	for (double j = minLineal; j < maxLineal; j+=0.1) //Iterate through every dose at a given lineal energy
 	{
 		gr->AddPoint(j,fittingFunction.GetValue(fitFuncParams,j));
+		// std::cout << "Point: " << j << " Value: " << fittingFunction.GetValue(fitFuncParams,j) << std::endl;
 	}
 
 	//Draw
