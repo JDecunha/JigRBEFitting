@@ -113,6 +113,7 @@ class Ceres_BWF_Fitter
 			{
 
 				double alphaPredicted = 0.; double betaPredicted = 0.;
+				double penaltyTerm = 0.; double penaltyWeight = 0.1;
 
 				for(int i = 1; i <= _linealSpectrum.GetNbinsX(); ++i) //Iterate over the lineal energy spectrum
 				{
@@ -127,7 +128,17 @@ class Ceres_BWF_Fitter
 
 					double ryBetaVal = _betaFunc.GetValue(parameters[1], center);
 					betaPredicted += ryBetaVal*value*width;
-					if (ryAlphaVal < 0 || ryBetaVal < 0) {return false;}
+
+					//Evaluate penalty terms
+					if(ryAlphaVal < 0)
+					{
+						penaltyTerm += -ryAlphaVal*penaltyWeight;
+					}
+					//Evaluate penalty terms
+					if(ryBetaVal < 0)
+					{
+						penaltyTerm += -ryBetaVal*penaltyWeight;
+					}
 				}
 
 				//calculate SF
@@ -135,7 +146,11 @@ class Ceres_BWF_Fitter
 				survivalPredicted = std::exp(-survivalPredicted);
 
 				//Return the residual
-				residual[0] = _SF - survivalPredicted;
+				double internalResidual = _SF - survivalPredicted;
+				//Ensure that the penalty term is added in the correct direction
+				if (internalResidual > 0) { internalResidual += penaltyTerm; }
+				if (internalResidual < 0) { internalResidual -= penaltyTerm; }
+				residual[0] = internalResidual;
 		    	return true;
 		 	}
 
