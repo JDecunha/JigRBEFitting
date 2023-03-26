@@ -30,7 +30,7 @@ class Ceres_BWF_Fitter
 		void SetAlphaParameterLowerConstraint(int index, double constraint);
 		void SetBetaParameterLowerConstraint(int index, double constraint);
 		void SetAlphaParameterUpperConstraint(int index, double constraint);
-		void SetPositiveConstrained(bool constrained) {_positiveConstrained = constrained;};
+		void SetPositiveConstrained(bool constrained, double penaltyWeight = 1.) {_positiveConstrained = constrained; _penaltyWeight = penaltyWeight;};
 
 
 		//Function to set ceres::Solver::Options with a user defined version rather than default
@@ -46,11 +46,11 @@ class Ceres_BWF_Fitter
 			_problem = ceres::Problem(); SetupResidualBlocks(); _initialized = true; _alreadyRun = false; 
 		};
 
-		//Right now reset isn't used for anything.
-		// void Reset() { _problem = ceres::Problem(); _initialized = true; _alreadyRun = false; };
-
 		//Public interface to start the fit
 		BWF_Fitting_Results Fit(); 
+
+		//Static helper functions
+		static void CheckFunctionNegativity(BiologicalWeightingFunction const& BWF, double lower = 0.1, double upper = 100); 
 
 	private:
 
@@ -101,65 +101,44 @@ class Ceres_BWF_Fitter
 				BiologicalWeightingFunction const _betaFunc;
 		};
 
-		struct Generalized_BWF_Residual_Positive_Constrained
+		struct BWF_Negative_Penalty
 		{
-			Generalized_BWF_Residual_Positive_Constrained(double dose, double SF, TH1D const& linealSpectrum, BiologicalWeightingFunction const& alphaFunc, BiologicalWeightingFunction const& betaFunc) 
-				: _dose(dose), _SF(SF), _linealSpectrum(linealSpectrum), _alphaFunc(alphaFunc), _betaFunc(betaFunc) 
+			BWF_Negative_Penalty(BiologicalWeightingFunction const& alphaFunc, BiologicalWeightingFunction const& betaFunc, double penaltyWeight = 1) 
+				: _alphaFunc(alphaFunc), _betaFunc(betaFunc), _penaltyWeight(penaltyWeight)
 			{
 
 			}
 
 			bool operator()(double const* const* parameters, double* residual) const 
 			{
+				double penaltyTerm = 0.;
 
-				double alphaPredicted = 0.; double betaPredicted = 0.;
-				double penaltyTerm = 0.; double penaltyWeight = 0.1;
-
-				for(int i = 1; i <= _linealSpectrum.GetNbinsX(); ++i) //Iterate over the lineal energy spectrum
+				for(double center = 0.1; center <= 250; center+=0.1) //Iterate over the lineal energy spectrum
 				{
-					//Get the spectrum value
-					double width = _linealSpectrum.GetBinWidth(i);
-					double center = _linealSpectrum.GetBinCenter(i);
-					double value = _linealSpectrum.GetBinContent(i);
-
 					//Accumulate the predicted value of alpha as we integrate the function
 					double ryAlphaVal = _alphaFunc.GetValue(parameters[0],center);
-					alphaPredicted += ryAlphaVal*value*width; //value*width is d(y)*dy, and everything else is r(y)
-
 					double ryBetaVal = _betaFunc.GetValue(parameters[1], center);
-					betaPredicted += ryBetaVal*value*width;
 
 					//Evaluate penalty terms
 					if(ryAlphaVal < 0)
 					{
-						penaltyTerm += -ryAlphaVal*penaltyWeight;
+						penaltyTerm += -ryAlphaVal*_penaltyWeight;
 					}
 					//Evaluate penalty terms
 					if(ryBetaVal < 0)
 					{
-						penaltyTerm += -ryBetaVal*penaltyWeight;
+						penaltyTerm += -ryBetaVal*_penaltyWeight;
 					}
 				}
 
-				//calculate SF
-				double survivalPredicted = ( (alphaPredicted*_dose) + (betaPredicted*_dose*_dose) );
-				survivalPredicted = std::exp(-survivalPredicted);
-
-				//Return the residual
-				double internalResidual = _SF - survivalPredicted;
-				//Ensure that the penalty term is added in the correct direction
-				if (internalResidual > 0) { internalResidual += penaltyTerm; }
-				if (internalResidual < 0) { internalResidual -= penaltyTerm; }
-				residual[0] = internalResidual;
+				//The residuals are automatically squared in the cost function. So I'm taking SQRT to make it linear.
+				residual[0] = std::sqrt(penaltyTerm);
 		    	return true;
 		 	}
 
 			private:
-
 				//Everything is const so once a residual block is defined it can't be changed
-				double const _dose;
-				double const _SF;
-				TH1D const& _linealSpectrum;
+				double const _penaltyWeight;
 				BiologicalWeightingFunction const _alphaFunc;
 				BiologicalWeightingFunction const _betaFunc;
 		};
@@ -187,6 +166,7 @@ class Ceres_BWF_Fitter
 		bool _optionsSet{false};
 		bool _initialized{false};
 		bool _alreadyRun{false};
+		double _penaltyWeight{1.};
 };
 
 

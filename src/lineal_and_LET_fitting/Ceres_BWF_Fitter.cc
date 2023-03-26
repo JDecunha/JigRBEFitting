@@ -19,40 +19,34 @@ void Ceres_BWF_Fitter::SetupResidualBlocks()
 
 		for (int j = 0; j < _survivalParams.dose[l].size(); ++j) //Iterate over every different dose level and determine surviving faction
 		{	
+			ceres::DynamicNumericDiffCostFunction<Generalized_BWF_Residual>* costFunc = new ceres::DynamicNumericDiffCostFunction<Generalized_BWF_Residual>
+				(new Generalized_BWF_Residual(_survivalParams.dose[l][j], _survivalParams.survivingFraction[l][j], dySpectrum, _alphaFitFunc, _betaFitFunc));
 
-			//Construct the cost function with the Dose, SF, dy spectrum, and fitting functions
-			if (_positiveConstrained)
-			{
-				ceres::DynamicNumericDiffCostFunction<Generalized_BWF_Residual_Positive_Constrained>* costFunc = new ceres::DynamicNumericDiffCostFunction<Generalized_BWF_Residual_Positive_Constrained>
-					(new Generalized_BWF_Residual_Positive_Constrained(_survivalParams.dose[l][j], _survivalParams.survivingFraction[l][j], dySpectrum, _alphaFitFunc, _betaFitFunc));
+			//Since we constructed a dynamic cost function, we have to tell it the number of parameters
+			costFunc->AddParameterBlock(_alphaFitFunc.GetNumFittingParams());
+			costFunc->AddParameterBlock(_betaFitFunc.GetNumFittingParams());
+			costFunc->SetNumResiduals(1); //Number of residuals is just 1, because 1 SF is calculated at a time
 
-				//Since we constructed a dynamic cost function, we have to tell it the number of parameters
-				costFunc->AddParameterBlock(_alphaFitFunc.GetNumFittingParams());
-				costFunc->AddParameterBlock(_betaFitFunc.GetNumFittingParams());
-				costFunc->SetNumResiduals(1); //Number of residuals is just 1, because 1 SF is calculated at a time
-
-				//Add a residual block with the alpha and beta BWF Fitting params
-				_problem.AddResidualBlock(costFunc, nullptr, _alphaFitFunc.GetFittingParams(), _betaFitFunc.GetFittingParams()); 
-			}
-			else
-			{
-				ceres::DynamicNumericDiffCostFunction<Generalized_BWF_Residual>* costFunc = new ceres::DynamicNumericDiffCostFunction<Generalized_BWF_Residual>
-					(new Generalized_BWF_Residual(_survivalParams.dose[l][j], _survivalParams.survivingFraction[l][j], dySpectrum, _alphaFitFunc, _betaFitFunc));
-
-				//Since we constructed a dynamic cost function, we have to tell it the number of parameters
-				costFunc->AddParameterBlock(_alphaFitFunc.GetNumFittingParams());
-				costFunc->AddParameterBlock(_betaFitFunc.GetNumFittingParams());
-				costFunc->SetNumResiduals(1); //Number of residuals is just 1, because 1 SF is calculated at a time
-
-				//Add a residual block with the alpha and beta BWF Fitting params
-				_problem.AddResidualBlock(costFunc, nullptr, _alphaFitFunc.GetFittingParams(), _betaFitFunc.GetFittingParams()); 
-			}
-			
-
-
+			//Add a residual block with the alpha and beta BWF Fitting params
+			_problem.AddResidualBlock(costFunc, nullptr, _alphaFitFunc.GetFittingParams(), _betaFitFunc.GetFittingParams()); 
 		}
 
 		++l; //iterate jig positions
+	}
+
+	//If positive constrained add the penalty term
+	if (_positiveConstrained)
+	{
+		ceres::DynamicNumericDiffCostFunction<BWF_Negative_Penalty>* costFunc = new ceres::DynamicNumericDiffCostFunction<BWF_Negative_Penalty>
+			(new BWF_Negative_Penalty(_alphaFitFunc, _betaFitFunc, _penaltyWeight));
+
+		//Since we constructed a dynamic cost function, we have to tell it the number of parameters
+		costFunc->AddParameterBlock(_alphaFitFunc.GetNumFittingParams());
+		costFunc->AddParameterBlock(_betaFitFunc.GetNumFittingParams());
+		costFunc->SetNumResiduals(1); //Number of residuals is just 1, because 1 SF is calculated at a time
+
+		//Add a residual block with the alpha and beta BWF Fitting params
+		_problem.AddResidualBlock(costFunc, nullptr, _alphaFitFunc.GetFittingParams(), _betaFitFunc.GetFittingParams()); 
 	}
 
 }
@@ -96,4 +90,37 @@ void Ceres_BWF_Fitter::SetAlphaParameterUpperConstraint(int index, double constr
 void Ceres_BWF_Fitter::SetBetaParameterLowerConstraint(int index, double constraint)
 {
 	_problem.SetParameterLowerBound(_betaFitFunc.GetFittingParams(),index, constraint);
+}
+
+void Ceres_BWF_Fitter::CheckFunctionNegativity(BiologicalWeightingFunction const& BWF, double lower, double upper)
+{
+        //Want to calculate the area under the function
+        //And also calculate how negative it is
+        double totalIntegralArea = 0.;
+        double areaUnderFunction = 0.;
+        double maxNegativeUnder = 0.;
+
+        for(double center = lower; center <= upper; center+=0.1) //Iterate over the lineal energy spectrum
+        {
+          //Accumulate the predicted value of alpha as we integrate the function
+          double ryVal = BWF.GetValue(center);
+          if (ryVal > 0)
+          {
+            totalIntegralArea += ryVal*0.1;
+          }
+          else
+          {
+            areaUnderFunction += ryVal*0.1;
+            totalIntegralArea += std::abs(ryVal)*0.1;
+            if (ryVal < maxNegativeUnder) {maxNegativeUnder = ryVal;}
+          }
+        }
+
+        if (maxNegativeUnder == 0.) { std::cout << "function is not negative." << std::endl; }
+        else
+        {
+          std::cout << "Area under Y-axis: " << std::abs(areaUnderFunction) << std::endl;
+          std::cout << "Fractional negative area: " << std::abs(areaUnderFunction*100.)/totalIntegralArea << "%" << std::endl;
+          std::cout << "Maximum negative value: " << maxNegativeUnder << std::endl;
+        }
 }

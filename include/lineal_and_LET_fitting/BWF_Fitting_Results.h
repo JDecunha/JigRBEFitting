@@ -13,4 +13,5 @@ class BWF_Fitting_Results
 		void PrintSummary();
 		void PrintBasic();
 		void PrintAIC(int const& numObservations);
+		void PrintRMSEMinusPenaltyFunction(double penaltyWeight, int const& numObservations, double lower = 0.1, double upper = 250.);
 };
