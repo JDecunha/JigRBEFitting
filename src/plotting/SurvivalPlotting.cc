@@ -153,7 +153,7 @@ void PlotAlphaBetaFromBWF(TCanvas* c, TLegend* legend, std::string const& legend
 	if (!legendAdded) { legend->AddEntry(gr, (TString)legendName, "P"); legendAdded = true; legend->Draw(); }
 }
 
-void SurvivalDataMultigraph(TCanvas* c, TLegend* legend, CellStudySurvivalParameters survivalParams)
+void SurvivalDataMultigraph(TCanvas* c, TLegend* legend, CellStudyBWFFittingParameters survivalParams)
 {
 	//Now let's iterate through our lineal energy library, plot, and do all that nice stuff
 	for (int i = 0; i < survivalParams.dose.size(); ++i)
@@ -240,4 +240,253 @@ void PlotSurvivalFromAlphaBeta(TCanvas* c, const std::vector<std::vector<double>
 	c->SaveAs((TString)outputName);
 
 	delete c;
+}
+
+void PlotRBE10SF(TCanvas* c, TLegend* legend, std::string const& legendName, TAttMarker const& markerAttributes, const TAttLine& lineAttributes, std::string options, CellStudyBWFFittingParameters survivalParams, double const* alphaBetasCesium, double const* alphaBetasProton)
+{
+	bool legendAdded = false; 
+	if (legendName == "") { legendAdded = true; }
+
+	//Assign either the alphas, or the betas to toPlot depending on the option
+	std::vector<double> toPlot;
+
+	for (int i = 0; i < survivalParams.LETd.size(); ++i)
+	{
+		//quadratic formula
+		double b = alphaBetasCesium[0];
+		double a = alphaBetasCesium[1];
+		double c = -1;
+		double resultCesium = (-b+std::sqrt((b*b)-(4*a*c)))/(2*a);
+
+		b = alphaBetasProton[i*2];
+		a = alphaBetasProton[(i*2)+1];
+		double resultProton = (-b+std::sqrt((b*b)-(4*a*c)))/(2*a);
+
+		//Push back the ratio of doses
+		toPlot.push_back(resultCesium/resultProton);
+	}
+	
+
+	//Constructor: Size and then two doubles
+	TGraph* gr = new TGraph(survivalParams.LETd.size(),survivalParams.LETd.data(),toPlot.data());
+
+	//Draw
+	gr->Draw((TString)options);
+
+	//Set axes
+	gr->SetTitle("");
+	//gr->SetTitleSize(0.03,"t"); //this doesn't do anything
+	gr->GetYaxis()->SetTitle("RBE(0.1 SF)"); 
+	gr->GetXaxis()->SetTitle("LET_{d} [keV/#mum]");
+	gr->GetXaxis()->CenterTitle(true);
+	gr->GetYaxis()->CenterTitle(true);
+	gr->GetXaxis()->SetTitleFont(42);
+	gr->GetYaxis()->SetTitleFont(42);
+	gr->GetXaxis()->SetTitleSize(0.052);
+	gr->GetYaxis()->SetTitleSize(0.058);
+	gr->GetYaxis()->SetTitleOffset(0.7);
+	
+
+	gr->SetMarkerColor(markerAttributes.GetMarkerColor());
+	gr->SetMarkerSize(markerAttributes.GetMarkerSize());
+	gr->SetMarkerStyle(markerAttributes.GetMarkerStyle());
+	gr->SetLineColor(lineAttributes.GetLineColor());
+	gr->SetLineWidth(lineAttributes.GetLineWidth());
+	gr->SetLineStyle(lineAttributes.GetLineStyle());
+
+	if (!legendAdded) { legend->AddEntry(gr, (TString)legendName, "P"); legendAdded = true; legend->Draw(); }
+}
+
+void PlotRBE10SF(TCanvas* c, TLegend* legend, std::string const& legendName, TAttMarker const& markerAttributes, std::string options, CellStudyBWFFittingParameters survivalParams, double const* alphaBetasCesium, BWF_Fitting_Results results)
+{
+	bool legendAdded = false; 
+	if (legendName == "") { legendAdded = true; }
+
+	const std::vector<std::pair<std::string,TH1D>> DySpectra = survivalParams.dySpectra;
+	int i = 0;
+
+	//Assign either the alphas, or the betas to toPlot depending on the option
+	std::vector<double> toPlot;
+	std::vector<double> alphaBetasProton;
+
+	//Iterate through each of the experiments levels
+	for(const std::pair<std::string,TH1D>& spectrumPair:DySpectra) //First we iterate over each of the lineal energy spectra
+	{
+		c->cd(i+1);
+		c->SetFillStyle(4000);
+		c->SetFrameFillStyle(4000);
+
+		const TH1D& dySpectrum = std::get<1>(spectrumPair); //Pulling a reference so we don't remake this object
+		double alphaValue = 0; double betaValue = 0;
+
+		for(int k = 1; k <= dySpectrum.GetNbinsX(); ++k) //Iterate over every histogram bin to calculate alpha
+		{
+			//Get the spectrum value
+			double width = dySpectrum.GetBinWidth(k);
+			double center = dySpectrum.GetBinCenter(k);
+			double value = dySpectrum.GetBinContent(k);
+
+			//Accumulate the predicted value of alpha as we integrate the function
+			double ryAlphaVal = results.alphaFunc.GetValue(center);
+			alphaValue += ryAlphaVal*value*width; //value*width is d(y)*dy, and everything else is r(y)
+
+			double ryBetaVal = results.betaFunc.GetValue(center);
+			betaValue += ryBetaVal*value*width; //value*width is d(y)*dy, and everything else is r(y)
+		}
+		
+		alphaBetasProton.push_back(alphaValue);
+		alphaBetasProton.push_back(betaValue);
+
+		++i;
+	}
+
+	
+
+	for (int i = 0; i < survivalParams.LETd.size(); ++i)
+	{
+		//quadratic formula
+		double b = alphaBetasCesium[0];
+		double a = alphaBetasCesium[1];
+		double c = -1;
+		double resultCesium = (-b+std::sqrt((b*b)-(4*a*c)))/(2*a);
+
+		b = alphaBetasProton[i*2];
+		a = alphaBetasProton[(i*2)+1];
+		double resultProton = (-b+std::sqrt((b*b)-(4*a*c)))/(2*a);
+
+		//Push back the ratio of doses
+		toPlot.push_back(resultCesium/resultProton);
+	}
+	
+
+	//Constructor: Size and then two doubles
+	TGraph* gr = new TGraph(survivalParams.LETd.size(),survivalParams.LETd.data(),toPlot.data());
+
+	//Draw
+	gr->Draw((TString)options);
+
+	//Set axes
+	gr->SetTitle("");
+	//gr->SetTitleSize(0.03,"t"); //this doesn't do anything
+	gr->GetYaxis()->SetTitle("RBE(0.1 SF)"); 
+	gr->GetXaxis()->SetTitle("LET_{d} [keV/#mum]");
+	gr->GetXaxis()->CenterTitle(true);
+	gr->GetYaxis()->CenterTitle(true);
+	gr->GetXaxis()->SetTitleFont(42);
+	gr->GetYaxis()->SetTitleFont(42);
+	gr->GetXaxis()->SetTitleSize(0.052);
+	gr->GetYaxis()->SetTitleSize(0.058);
+	gr->GetYaxis()->SetTitleOffset(0);
+	gr->GetXaxis()->SetTitleOffset(1.15);
+
+	gr->SetMarkerColor(markerAttributes.GetMarkerColor());
+	gr->SetMarkerSize(markerAttributes.GetMarkerSize());
+	gr->SetMarkerStyle(markerAttributes.GetMarkerStyle());
+
+	if (!legendAdded) { legend->AddEntry(gr, (TString)legendName, "P"); legendAdded = true; legend->Draw(); }
+}
+
+void PlotRBE10SFMcNamara(TCanvas* c, TLegend* legend, std::string const& legendName, TAttMarker const& markerAttributes, const TAttLine& lineAttributes,  std::string options, CellStudyBWFFittingParameters survivalParams, double const* alphaBetasCesium)
+{
+	bool legendAdded = false; 
+	if (legendName == "") { legendAdded = true; }
+
+	//Calculate D_10% for cesium
+	//quadratic formula
+	double b = alphaBetasCesium[0];
+	double a = alphaBetasCesium[1];
+	double cval = -1;
+	double D10Cesium = (-b+std::sqrt((b*b)-(4*a*cval)))/(2*a);
+
+	//Assign either the alphas, or the betas to toPlot depending on the option
+	std::vector<double> toPlot;
+
+	//Steps:
+	//Step 1.) Calculate RBE McNamara at all D_ps less than D_cesium for 0.1 SF
+	//Step 2.) Iterate through the list of RBE McNamara and multiply D_p * RBE to give D_x
+	//Step 3.) Find the D_x which is closest to D_x 0.1 SF and extract D_p from that.
+	//Step 4.) Take RBE at that value
+
+	double alphaBetaCesium = alphaBetasCesium[0]/alphaBetasCesium[1];
+	double alphaBetaCesiumSquared = alphaBetaCesium*alphaBetaCesium;
+	double p0 = 0.999064;
+	double p1 = 0.35605;
+	double p2 = 1.1012;
+	double p3 = -0.0038703;
+
+	for (int i = 0; i < survivalParams.LETd.size(); ++i)
+	{
+		std::vector<double> ProtonDoses; 
+		std::vector<double> RBEMcNamara; 
+		std::vector<double> RBETimesProtonDose; 
+		double LETd = survivalParams.LETd[i];
+		// std::cout << "LET: " << LETd << std::endl;
+		// std::cout << "Alpha beta cesium ratio: " << alphaBetaCesium << std::endl;
+
+		for (double j = 0.01; j <= D10Cesium; j+=0.01) //Calculate RBE McNamara at all the doses
+		{
+			double outFrontTerm = 1/(2*j);
+			double term1 = alphaBetaCesiumSquared;
+			double term2 = (4*j*alphaBetaCesium)*(p0+((p1/alphaBetaCesium)*LETd));
+			double term3 = (4*j*j)*(p2-((p3*std::sqrt(alphaBetaCesium))*LETd))*(p2-((p3*std::sqrt(alphaBetaCesium))*LETd));
+			
+			double sqrtTerm = std::sqrt(term1+term2+term3);
+			double RBE = outFrontTerm*(sqrtTerm-alphaBetaCesium);
+
+			// std::cout << outFrontTerm << " " << term1 << " " << term2 << " " << term3 << std::endl;
+
+			RBEMcNamara.push_back(RBE);
+			ProtonDoses.push_back(j);
+			RBETimesProtonDose.push_back(RBE*j);
+			// std::cout << "Dp: " << j << " RBE: " << RBE << std::endl << std::endl;
+		}
+
+		double DiffDxProtonDx = 100;
+		double DiffDxProtonDxLastIteration = 100;
+		double RBE = 0.;
+
+		for (int k  = 0; k < ProtonDoses.size(); ++k)
+		{
+			DiffDxProtonDxLastIteration = DiffDxProtonDx;
+			DiffDxProtonDx = std::abs(RBETimesProtonDose[k]-D10Cesium);
+			if (DiffDxProtonDx > DiffDxProtonDxLastIteration)
+			{
+				RBE = RBEMcNamara[k];
+				// std::cout << RBE << std::endl;
+				break;
+			}
+		}
+
+		//Push back the ratio of doses
+		toPlot.push_back(RBE);
+	}
+	
+
+	//Constructor: Size and then two doubles
+	TGraph* gr = new TGraph(survivalParams.LETd.size(),survivalParams.LETd.data(),toPlot.data());
+
+	//Draw
+	gr->Draw((TString)options);
+
+	//Set axes
+	gr->SetTitle("");
+	//gr->SetTitleSize(0.03,"t"); //this doesn't do anything
+	gr->GetYaxis()->SetTitle("RBE(0.1 SF)"); 
+	gr->GetXaxis()->SetTitle("LET_{d} [keV/#mum]");
+	gr->GetXaxis()->CenterTitle(true);
+	gr->GetYaxis()->CenterTitle(true);
+	gr->GetXaxis()->SetTitleFont(42);
+	gr->GetYaxis()->SetTitleFont(42);
+	gr->GetXaxis()->SetTitleSize(0.052);
+	gr->GetYaxis()->SetTitleSize(0.058);
+	gr->GetYaxis()->SetTitleOffset(0.9);
+
+	gr->SetMarkerColor(markerAttributes.GetMarkerColor());
+	gr->SetMarkerSize(markerAttributes.GetMarkerSize());
+	gr->SetMarkerStyle(markerAttributes.GetMarkerStyle());
+	gr->SetLineColor(lineAttributes.GetLineColor());
+	gr->SetLineWidth(lineAttributes.GetLineWidth());
+	gr->SetLineStyle(lineAttributes.GetLineStyle());
+
+	if (!legendAdded) { legend->AddEntry(gr, (TString)legendName, "L"); legendAdded = true; legend->Draw(); }
 }

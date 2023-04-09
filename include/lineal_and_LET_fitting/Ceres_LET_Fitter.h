@@ -17,7 +17,7 @@
 #include "BWF_Fitting_Results.h"
 
 
-class Ceres_BWF_Fitter
+class Ceres_LET_Fitter
 {
 	public:
 
@@ -40,9 +40,9 @@ class Ceres_BWF_Fitter
 		//We need to initialize the problem before setting the constraints
 		void Initialize() 
 		{ 
-			if(!_paramsSet) {std::cout << "Attempt to use Ceres_BWF_Fitter without setting survival params. Failure." << std::endl; throw; }
-			if(!_alphaFunctionSet) {std::cout << "Attempt to use Ceres_BWF_Fitter without setting  alpha biological weighting function to fit. Failure." << std::endl; throw; }
-			if(!_betaFunctionSet) {std::cout << "Attempt to use Ceres_BWF_Fitter without setting  beta biological weighting function to fit. Failure." << std::endl; throw; }
+			if(!_paramsSet) {std::cout << "Attempt to use Ceres_LET_Fitter without setting survival params. Failure." << std::endl; throw; }
+			if(!_alphaFunctionSet) {std::cout << "Attempt to use Ceres_LET_Fitter without setting  alpha biological weighting function to fit. Failure." << std::endl; throw; }
+			if(!_betaFunctionSet) {std::cout << "Attempt to use Ceres_LET_Fitter without setting  beta biological weighting function to fit. Failure." << std::endl; throw; }
 			_problem = ceres::Problem(); SetupResidualBlocks(); _initialized = true; _alreadyRun = false; 
 		};
 
@@ -54,10 +54,10 @@ class Ceres_BWF_Fitter
 
 	private:
 
-		struct Generalized_BWF_Residual
+		struct Generalized_LET_Residual
 		{
-			Generalized_BWF_Residual(double dose, double SF, TH1D const& linealSpectrum, BiologicalWeightingFunction const& alphaFunc, BiologicalWeightingFunction const& betaFunc) 
-				: _dose(dose), _SF(SF), _linealSpectrum(linealSpectrum), _alphaFunc(alphaFunc), _betaFunc(betaFunc) 
+			Generalized_LET_Residual(double dose, double SF, double LETd, BiologicalWeightingFunction const& alphaFunc, BiologicalWeightingFunction const& betaFunc) 
+				: _dose(dose), _SF(SF), _LETd(LETd), _alphaFunc(alphaFunc), _betaFunc(betaFunc) 
 			{
 
 			}
@@ -67,20 +67,8 @@ class Ceres_BWF_Fitter
 
 				double alphaPredicted = 0.; double betaPredicted = 0.;
 
-				for(int i = 1; i <= _linealSpectrum.GetNbinsX(); ++i) //Iterate over the lineal energy spectrum
-				{
-					//Get the spectrum value
-					double width = _linealSpectrum.GetBinWidth(i);
-					double center = _linealSpectrum.GetBinCenter(i);
-					double value = _linealSpectrum.GetBinContent(i);
-
-					//Accumulate the predicted value of alpha as we integrate the function
-					double ryAlphaVal = _alphaFunc.GetValue(parameters[0],center);
-					alphaPredicted += ryAlphaVal*value*width; //value*width is d(y)*dy, and everything else is r(y)
-
-					double ryBetaVal = _betaFunc.GetValue(parameters[1], center);
-					betaPredicted += ryBetaVal*value*width;
-				}
+				alphaPredicted = _alphaFunc.GetValue(parameters[0],_LETd);
+				betaPredicted = _betaFunc.GetValue(parameters[1], _LETd);
 
 				//Logarithmic residual
 				double survivalPredicted = -( (alphaPredicted*_dose) + (betaPredicted*_dose*_dose) );
@@ -104,14 +92,14 @@ class Ceres_BWF_Fitter
 				//Everything is const so once a residual block is defined it can't be changed
 				double const _dose;
 				double const _SF;
-				TH1D const& _linealSpectrum;
+				double const _LETd;
 				BiologicalWeightingFunction const _alphaFunc;
 				BiologicalWeightingFunction const _betaFunc;
 		};
 
-		struct BWF_Negative_Penalty
+		struct LET_Function_Negative_Penalty
 		{
-			BWF_Negative_Penalty(BiologicalWeightingFunction const& alphaFunc, BiologicalWeightingFunction const& betaFunc, double penaltyWeight = 1) 
+			LET_Function_Negative_Penalty(BiologicalWeightingFunction const& alphaFunc, BiologicalWeightingFunction const& betaFunc, double penaltyWeight = 1) 
 				: _alphaFunc(alphaFunc), _betaFunc(betaFunc), _penaltyWeight(penaltyWeight)
 			{
 
@@ -153,7 +141,7 @@ class Ceres_BWF_Fitter
 
 
 		//Internal functions to conduct the fitting
-		void GeneralizedBWFFitting();
+		void GeneralizedLETFitting();
 		void SetupResidualBlocks();
 
 		//The fitter owns its survival parameters and fitting function
@@ -177,28 +165,3 @@ class Ceres_BWF_Fitter
 		double _penaltyWeight{1.};
 };
 
-
-
-class Ceres_BWF_Fitting_Callback : public ceres::IterationCallback 
-{
-	public:
-		explicit Ceres_BWF_Fitting_Callback(BiologicalWeightingFunction* alphaFunc, BiologicalWeightingFunction* betaFunc) 
-		: _pAlphaFunc(alphaFunc), _pBetaFunc(betaFunc)
-		{}
-		
-		~Ceres_BWF_Fitting_Callback() {}
-
-		ceres::CallbackReturnType operator() (const ceres::IterationSummary& summary) 
-		{
-			std::cout << "\u001b[31m\e[1mIteration #: \e[0m\u001b[0m" << summary.iteration;
-			std::cout << "\u001b[34m\e[1m Alpha: \e[0m\u001b[0m"; _pAlphaFunc->PrintFitParams();
-			std::cout << "\u001b[34m\e[1m  Beta: \e[0m\u001b[0m"; _pBetaFunc->PrintFitParams();
-			std::cout << std::endl;
-
-			return ceres::SOLVER_CONTINUE;
-		}
-
-	private:
-		BiologicalWeightingFunction* _pAlphaFunc;
-		BiologicalWeightingFunction* _pBetaFunc;
-};

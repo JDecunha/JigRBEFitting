@@ -68,3 +68,56 @@ void BWF_Fitting_Results::PrintRMSEMinusPenaltyFunction(double penaltyWeight, in
 	double AIC = (numObservations*std::log(RMSE_Corrected*RMSE_Corrected))+2*nParams;
 	std::cout << "AIC: " << AIC << std::endl;
 }
+
+void BWF_Fitting_Results::PrintRMSEBSurvivingFractionandAIC(const CellStudyBWFFittingParameters& survivalParams, int const& numObservations)
+{
+	const std::vector<std::pair<std::string,TH1D>> DySpectra = survivalParams.dySpectra;
+	const std::vector<std::vector<double>> doselist = survivalParams.dose;
+	double RMSE = 0.;
+	int i = 0;
+
+	//Iterate through each of the experiments levels
+	for(const std::pair<std::string,TH1D>& spectrumPair:DySpectra) //First we iterate over each of the lineal energy spectra
+	{
+		const TH1D& dySpectrum = std::get<1>(spectrumPair); //Pulling a reference so we don't remake this object
+		double alphaPredicted = 0;
+		double betaPredicted = 0;
+
+		for(int k = 1; k <= dySpectrum.GetNbinsX(); ++k) //Iterate over every histogram bin to calculate alpha
+		{
+			//Get the spectrum value
+			double width = dySpectrum.GetBinWidth(k);
+			double center = dySpectrum.GetBinCenter(k);
+			double value = dySpectrum.GetBinContent(k);
+
+			//Accumulate the predicted value of alpha as we integrate the function
+			double ryAlphaVal = this->alphaFunc.GetValue(center);
+			alphaPredicted += ryAlphaVal*value*width; //value*width is d(y)*dy, and everything else is r(y)
+
+			double ryBetaVal = this->betaFunc.GetValue(center);
+			betaPredicted += ryBetaVal*value*width; //value*width is d(y)*dy, and everything else is r(y)
+
+		}
+
+	   //For that experiment iterate through every datapoint
+	   for (int j = 0; j < survivalParams.dose[i].size(); ++j)
+	   {
+	   		double calculatedSF = (alphaPredicted*(survivalParams.dose[i][j]))+(betaPredicted*(survivalParams.dose[i][j]*survivalParams.dose[i][j]));
+	   		calculatedSF = std::exp(-calculatedSF);
+
+	   		RMSE += ((survivalParams.survivingFraction[i][j] - calculatedSF)*(survivalParams.survivingFraction[i][j] - calculatedSF));
+	   }
+		++i;
+	}
+
+	RMSE = std::sqrt(RMSE);
+
+	std::cout << std::endl << "RMSE: " << RMSE << std::endl;
+
+	//Calc AIC
+	int nParams = summary.num_parameters; std::cout << "Num params: " << nParams << std::endl;
+	double AIC = (numObservations*std::log(RMSE*RMSE))+2*nParams;
+	std::cout << "AIC: " << AIC << std::endl;
+
+
+}
