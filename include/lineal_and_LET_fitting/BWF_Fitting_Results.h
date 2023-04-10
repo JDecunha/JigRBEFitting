@@ -13,7 +13,7 @@ class BWF_Fitting_Results
 
 		void PrintSummary();
 		void PrintBasic();
-		void PrintAIC(int const& numObservations);
+		void PrintAIC(double penaltyWeight, int const& numObservations, double lower = 0.1, double upper = 120.);
 		void PrintRMSEMinusPenaltyFunction(double penaltyWeight, int const& numObservations, double lower = 0.1, double upper = 120.);
 
 		//This prints the RMSE as calculated from the surviving fraction alone, not the log(SF) terms.
