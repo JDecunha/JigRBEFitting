@@ -5313,6 +5313,11 @@ void Best_Model_Plotting()
 
 }
 
+void H460_Consecutive_Fitting()
+{
+	
+}
+
 void H460_Ceres()
 {
 	Fifth_Beta();
