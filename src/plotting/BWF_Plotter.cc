@@ -158,6 +158,98 @@ void AlphaBetaMultigraphResiduals(TCanvas* c, TLegend* legend, const TAttLine& l
 	}
 }
 
+void AlphaBetaMultigraphResidualsLET(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BWF_Fitting_Results results,  double minDose, double maxDose)
+{
+	const std::vector<double> LETDs = survivalParams.LETd;
+	const std::vector<std::vector<double>> doselist = survivalParams.dose;
+	const int nAlphaparams = results.alphaFunc.GetNumFittingParams();
+	const int nParams = (results.alphaFunc.GetNumFittingParams()+results.betaFunc.GetNumFittingParams());
+	int i = 0;
+
+	//Iterate through each of the experiments levels
+	for(const double _LETd:LETDs) //First we iterate over each of the lineal energy spectra
+	{
+
+		c->cd(i+1);
+		c->SetFillStyle(4000);
+		c->SetFrameFillStyle(4000);
+
+		TGraph* gr = new TGraph();
+
+		double alphaPredicted = 0;
+		double betaPredicted = 0;
+		double largestVal = 0;
+
+		alphaPredicted = results.alphaFunc.GetValue(_LETd);
+		betaPredicted = results.betaFunc.GetValue(_LETd);
+
+	   //For that experiment iterate through every datapoint
+	   for (int j = 0; j < survivalParams.dose[i].size(); ++j)
+	   {
+	   		double calculatedSF = (alphaPredicted*(survivalParams.dose[i][j]))+(betaPredicted*(survivalParams.dose[i][j]*survivalParams.dose[i][j]));
+	   		calculatedSF = std::exp(-calculatedSF);
+
+	   		//Add the difference point to the graph
+	   		double dataPoint = calculatedSF-survivalParams.survivingFraction[i][j];
+	   		if (std::fabs(dataPoint) > largestVal) { largestVal = std::fabs(dataPoint); }
+	   		gr->AddPoint(survivalParams.dose[i][j],calculatedSF-survivalParams.survivingFraction[i][j]);
+	   }
+
+
+		//Draw
+		gr->Draw("AP");
+
+		//Set axes
+		gr->SetTitle("");
+		//gr->SetTitleSize(0.03,"t"); //this doesn't do anything
+		gr->GetYaxis()->SetTitle("P(SF)-SF");
+		gr->GetXaxis()->SetTitle("Dose [Gy]");
+		gr->GetXaxis()->CenterTitle(true);
+		gr->GetYaxis()->CenterTitle(true);
+		gr->GetXaxis()->SetTitleFont(42);
+		gr->GetYaxis()->SetTitleFont(42);
+		gr->GetXaxis()->SetTitleSize(0.052);
+		gr->GetYaxis()->SetTitleSize(0.058);
+		gr->GetXaxis()->SetTitleOffset(0.85);
+		gr->GetYaxis()->SetTitleOffset(0.85);
+		// gr->GetYaxis()->SetRangeUser(-0.5,0.5);
+		gr->GetXaxis()->SetLimits(0,5.5);
+		
+		//Make the limit symmetric about Y
+		double minAbs = std::fabs(c->GetUymin());
+		double maxAbs = std::fabs(c->GetUymax());
+		if (minAbs > maxAbs) {maxAbs = minAbs;} //See if the negative or positive side is larger
+		gr->GetYaxis()->SetRangeUser(-largestVal*1.05,largestVal*1.05); //set the new y Limits
+
+		//Set histogram fill and line settings
+		gr->SetLineWidth(5);
+
+		gr->SetMarkerColor(kRed);
+		gr->SetMarkerSize(4);
+		gr->SetMarkerStyle(8);
+
+		// Create an output string stream
+		std::ostringstream outputstream;
+		// Set Fixed -Point Notation
+		outputstream << std::fixed;
+		// Set precision to 2 digits
+		outputstream << std::setprecision(1);
+		//Add double to stream
+		outputstream << survivalParams.LETd[i];
+		std::string titlestring = outputstream.str() + " keV/#mum";
+		TLatex *t = new TLatex(0.015, 0.935, (TString)titlestring);
+		t->SetNDC(); //set position in coordinate system relative to canvas
+		t->Draw();
+
+		TLine* l = new TLine(0,0,5.5,0);
+		l->SetLineStyle(9);
+		l->SetLineWidth(4);
+		l->Draw();
+
+		++i;
+	}
+}
+
 void GeneralizedBWFMultigraphPlotter(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudySurvivalParameters& survivalParams, BiologicalWeightingFunction fittingFunction, double* fitFuncParams,  double minDose, double maxDose)
 {
 	const std::vector<std::pair<std::string,TH1D>> DySpectra = survivalParams.dySpectra;

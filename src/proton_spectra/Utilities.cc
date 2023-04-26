@@ -141,11 +141,11 @@ void Utilities::PMF_to_FrequencyFunction(TH1* h)
 		double high_edge = h->GetBinLowEdge(i+1);
 		double bin_middle = (high_edge+low_edge)/double(2);
 		double width = h->GetBinWidth(i);
-		double per_width = bin_middle/(width);
+		double per_width = value/(width);
 
-		//This works because each bin value = bin_middle/width now
-		//So integration would be given by bin_middle*width/width
-		normalization += bin_middle;
+		//This works because each bin value = value/width now
+		//So integration would be given by value*width/width
+		normalization += value;
 		h->SetBinContent(i,per_width);
 	}
 	

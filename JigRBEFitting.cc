@@ -7,8 +7,12 @@
 #include "H460_LET_Ceres.h"
 #include "H1437_Ceres.h"
 #include "H1437_LET_Ceres.h"
+#include "Uwes_Spectrum.h"
 
 int main()
 {
-	H1437_LET_Ceres();
+	// auto out = LinealSpectra::GetKeWeightedFrequencyLinealSpectra("1e3");
+	// LinealSpectra::PlotKeWeightedLinealSpectra(out);
+	// LinealSpectra::SaveKeWeightedFrequencyLinealSpectra();
+	Uwes_Spectrum();
 };

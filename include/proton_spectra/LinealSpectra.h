@@ -46,6 +46,7 @@ namespace LinealSpectra
 		
 		//Save the weighted lineal spectra
 		void SaveKeWeightedLinealSpectra();
+		void SaveKeWeightedFrequencyLinealSpectra();
 
 		//For the Lineal energy library manuscript
 		void CompareGeant4toFluenceWeighting();

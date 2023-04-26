@@ -130,7 +130,7 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedFrequencyLi
 		std::string KEColumnName = std::get<0>(spectra);
 
 		//Just get the bins for the output spectrum
-		TH1D outputLinealSpectrum = utils::GetDy(fyFolder, 0.1, targetSize);
+		TH1D outputLinealSpectrum = utils::GetFy(fyFolder, 0.1, targetSize);
 		outputLinealSpectrum.Scale(0); //to eliminate the data and leave the bins
 
 		//Loop over the KE spectrum and weight the f(y) spectra accordingly
@@ -146,8 +146,8 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedFrequencyLi
 			outputLinealSpectrum.Add(&tempLinealSpectrum);
 		}	
 		
-		//Convert N(y) to d(y)
-		utils::PMF_to_DoseFunction(&outputLinealSpectrum);
+		//Convert N(y) to f(y)
+		utils::PMF_to_FrequencyFunction(&outputLinealSpectrum);
 		//utils::VerifyNormalization(outputLinealSpectrum); //Shows all spectra are normalized to 1 within 1e-7
 		linealEnergyLibrary.push_back(std::make_pair<std::string,TH1D>(std::move(KEColumnName),std::move(outputLinealSpectrum)));
 	}
@@ -459,6 +459,26 @@ void LinealSpectra::SaveKeWeightedLinealSpectra()
 
 		//Open the file and write the value
 		TFile* keWeightedLinealSpectraOutputFile = TFile::Open((TString)("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealSpectraCellStudy_"+value+"nm.root"),"RECREATE");
+		keWeightedLinealSpectraOutputFile->WriteObject(&keWeightedSpectra, "Lineal_energy_library");
+
+		//Close the file
+		keWeightedLinealSpectraOutputFile->Close();
+	}
+}
+
+void LinealSpectra::SaveKeWeightedFrequencyLinealSpectra()
+{
+	//Add entry to the dictionary so ROOT can read and save files with the given std library type
+	gInterpreter->GenerateDictionary("pair<string,TH1D>;vector<pair<string,TH1D> >", "TH1.h;string;utility;vector");
+
+	//Get the KeWeighted lineal energy spectra
+	std::vector<std::string> targetSizes{"10","50","100","200","300","400","500","600","700","800","900","1e3"};
+	for (const auto& value : targetSizes)
+	{
+		auto keWeightedSpectra = GetKeWeightedFrequencyLinealSpectra(value);
+
+		//Open the file and write the value
+		TFile* keWeightedLinealSpectraOutputFile = TFile::Open((TString)("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealFYSpectraCellStudy_"+value+"nm.root"),"RECREATE");
 		keWeightedLinealSpectraOutputFile->WriteObject(&keWeightedSpectra, "Lineal_energy_library");
 
 		//Close the file

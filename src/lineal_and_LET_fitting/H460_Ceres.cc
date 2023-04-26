@@ -29,7 +29,9 @@
 #include "LinealSpectra.h" 
 //Functions for fitting and plotting
 #include "SurvivalPlotting.h"
+#include "Ceres_Survival_Fitter.h"
 #include "Ceres_BWF_Fitter.h"
+#include "Ceres_LET_Fitter.h"
 #include "AlphaBeta_Fitter.h"
 #include "BWF_Fitting_Results.h"
 #include "BWF_Plotter.h"
@@ -105,7 +107,7 @@ void SetupH460SurvivalParameters()
 	//Get the lineal energy spectra library
 	gInterpreter->GenerateDictionary("pair<string,TH1F>;vector<pair<string,TH1F> >", "TH1.h;string;utility;vector");
 	std::vector<std::pair<std::string, TH1D>>* dySpectraLibrary;
-	TFile* dySpectrumFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealSpectraCellStudy_1e3nm.root");
+	TFile* dySpectrumFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealFYSpectraCellStudy_1e3nm.root");
 	dySpectrumFile->GetObject("Lineal_energy_library",dySpectraLibrary);
 	dySpectrumFile->Close(); //Close file
 
@@ -4763,17 +4765,22 @@ void Survival_Fitting()
 	c->SetBottomMargin(0.13);
 	// c->Divide(4,3,0.000000005,0.001);
 	// auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
-	auto legend = new TLegend(0.08,0.72,0.08+0.27,0.72+0.23);
-	legend->SetTextSize(0.05);
+	auto legend = new TLegend(0.14,0.64,0.14+0.23,0.72+0.23);
+	legend->SetTextSize(0.04);
 
 	TAttMarker markerAtts;
-	markerAtts.SetMarkerColor(kBlack);
-	markerAtts.SetMarkerSize(8);
-	markerAtts.SetMarkerStyle(8);
+
+	markerAtts.SetMarkerSize(10);
+	
 	TAttLine lineStyle{};
-	lineStyle.SetLineWidth(5);
-	lineStyle.SetLineStyle(1);
-	lineStyle.SetLineColor(kBlack);
+
+	Ceres_Survival_Fitter CeresSurvival{};
+	CeresSurvival.SetCellStudyParameters(H460FittingParams);
+	CeresSurvival.Initialize();
+	auto results = CeresSurvival.Fit();
+
+	results.PrintSummary();
+	
 
 	// PlotAlphaBeta(c, legend, "", markerAtts, "AP", H460FittingParams, AlphaBeta, false);
 	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/alpha_H460.jpg";
@@ -4783,45 +4790,67 @@ void Survival_Fitting()
 	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/beta_H460.jpg";
 	// c->SaveAs((TString)outputName); 
 
-	double* cesiumAlphaBeta = new double[2];
-	cesiumAlphaBeta[0] = 0.290; cesiumAlphaBeta[1] = 0.083;
-	PlotRBE10SF(c, legend, "Guan 2015", markerAtts, lineStyle, "AP", H460FittingParams,cesiumAlphaBeta,AlphaBeta);
+	// double* cesiumAlphaBeta = new double[2];
+	// cesiumAlphaBeta[0] = 0.290; cesiumAlphaBeta[1] = 0.083;
 
 
-	Ceres_BWF_Fitter BWFFitter{};
-	std::cout << std::endl << "Linear" << std::endl;
-	BWFFitter.SetAlphaWeightingFunction(LinearBWF);
-	// FixedBWF.SetValues(std::vector<double> {0.13}); //Give beta value before passing into the fitter
-	// FifthBWF.SetValues(std::vector<double> {-3.62923e-21, -1.02135e-05, 0.00129381, -0.0357744, 0.220213, -0.107979});
-	BWFFitter.SetBetaWeightingFunction(FixedBWF);
-	BWFFitter.SetCellStudyParameters(H460FittingParams);
-	double penaltyWeight = 0.001; //0.01;
-	BWFFitter.SetPositiveConstrained(true, penaltyWeight);
-	BWFFitter.Initialize();
 
-	std::cout << std::endl << "QE2" << std::endl;
-	QE2BWF.SetValues(std::vector<double> {0.150172, -0.000226012, 0.000121788});
-	BWFFitter.SetAlphaWeightingFunction(QE2BWF);
-	FifthBWF.SetValues(std::vector<double> {0,0,8.29326e-06, 0.000106663, -0.0147373, 0.183807});
-	BWFFitter.SetBetaWeightingFunction(FifthBWF);
-	BWFFitter.Initialize();
-	auto QE2Results = BWFFitter.Fit();
-	QE2Results.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(QE2Results.alphaFunc);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(QE2Results.betaFunc);
+	// Ceres_BWF_Fitter BWFFitter{};
+	// std::cout << std::endl << "Cubic" << std::endl;
+	// BWFFitter.SetAlphaWeightingFunction(CubicBWF);
+	// // FixedBWF.SetValues(std::vector<double> {0.13}); //Give beta value before passing into the fitter
+	// // FifthBWF.SetValues(std::vector<double> {-3.62923e-21, -1.02135e-05, 0.00129381, -0.0357744, 0.220213, -0.107979});
+	// BWFFitter.SetBetaWeightingFunction(QuadraticBWF);
+	// BWFFitter.SetCellStudyParameters(H460FittingParams);
+	// double penaltyWeight = 0.05; //0.01;
+	// BWFFitter.SetPositiveConstrained(true, penaltyWeight);
+	// BWFFitter.Initialize();
+	// auto cubicsecond = BWFFitter.Fit();
+	// cubicsecond.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(cubicsecond.alphaFunc);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(cubicsecond.betaFunc);
 
-	markerAtts.SetMarkerColor(kPink-6);
-	markerAtts.SetMarkerStyle(23);
-	PlotRBE10SF(c, legend, "QE2", markerAtts, "P", H460FittingParams,cesiumAlphaBeta,QE2Results);
+	// Ceres_LET_Fitter BWFFitter2;
+	// std::cout << std::endl << "LQE2" << std::endl;
+	// // LQE2BWF.SetValues(std::vector<double> {0.228648, -0.000117843, 0.000980533, -0.0299326});
+	// BWFFitter2.SetAlphaWeightingFunction(LQE2BWF);
+	// // FourthBWF.SetValues(std::vector<double> {0,1.37078e-05, -0.00054164, -0.000957938, 0.150888});
+	// BWFFitter2.SetBetaWeightingFunction(FourthBWF);
+	// BWFFitter2.SetCellStudyParameters(H460FittingParams);
+	// // double penaltyWeight = 0.01; //0.01;
+	// BWFFitter2.SetPositiveConstrained(true, penaltyWeight);
+	// BWFFitter2.Initialize();
+	// auto LQE2Results = BWFFitter2.Fit();
+	// LQE2Results.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
+	// Ceres_LET_Fitter::CheckFunctionNegativity(LQE2Results.alphaFunc);
+	// Ceres_LET_Fitter::CheckFunctionNegativity(LQE2Results.betaFunc);
 
-	// markerAtts.SetMarkerColor(kGreen+2);
-	lineStyle.SetLineWidth(10);
-	lineStyle.SetLineStyle(3);
-	lineStyle.SetLineColor(kSpring-7);
-	PlotRBE10SFMcNamara(c, legend, "McNamara", markerAtts, lineStyle, "L", H460FittingParams,cesiumAlphaBeta);
+	// // markerAtts.SetMarkerColor(kGreen+2);
+	// lineStyle.SetLineWidth(14);
+	// gStyle->SetLineStyleString(11,"400 100");
+	// lineStyle.SetLineStyle(11);
+	// lineStyle.SetLineColor(kRed-6);
+	// PlotRBE10SFMcNamara(c, legend, "McNamara", markerAtts, lineStyle, "AL", H460FittingParams,cesiumAlphaBeta);
+	// lineStyle.SetLineColor(kAzure-8);
+	// PlotRBE10SFChenAndAhmad(c, legend, "Chen and Ahmad", markerAtts, lineStyle, "L", H460FittingParams,cesiumAlphaBeta);
+	// lineStyle.SetLineColor(kGreen-8);
+	// PlotRBE10SFWedenberg(c, legend, "Wedenberg", markerAtts, lineStyle, "L", H460FittingParams,cesiumAlphaBeta);
 
-	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/RBE_10_SF_H460.jpg";
-	c->SaveAs((TString)outputName); 
+	// markerAtts.SetMarkerColor(kViolet+4);
+	// markerAtts.SetMarkerStyle(20);
+	// PlotRBE10SF(c, legend, "d(y) spectrum", markerAtts, "P", H460FittingParams,cesiumAlphaBeta,cubicsecond);
+
+	// markerAtts.SetMarkerColor(kTeal+3);
+	// markerAtts.SetMarkerStyle(34);
+	// PlotRBE10SFLET(c, legend, "LET_{d}", markerAtts, "P", H460FittingParams,cesiumAlphaBeta,LQE2Results);
+	// markerAtts.SetMarkerColor(kBlack);markerAtts.SetMarkerStyle(23);
+	// PlotRBE10SF(c, legend, "Guan 2015", markerAtts, lineStyle, "P", H460FittingParams,cesiumAlphaBeta,AlphaBeta);
+	
+
+	
+
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/RBE_10_SF_H460.jpg";
+	// c->SaveAs((TString)outputName); 
 
 	// void PlotRBE10SF(TCanvas* c, TLegend* legend, std::string const& legendName, TAttMarker const& markerAttributes, std::string options, CellStudyBWFFittingParameters survivalParams, double const* alphaBetasCesium, double const* alphaBetasProton)
 }
@@ -6632,5 +6661,5 @@ void H460_Consecutive_Fitting()
 
 void H460_Ceres()
 {
-	H460_Consecutive_Fitting();
+	Survival_Fitting();
 }

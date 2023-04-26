@@ -5990,6 +5990,28 @@ void H1437_Consecutive_Fitting()
 	LQE2FifthResults.PrintAIC(penaltyWeight, 105);
 	MorstinFifthResults.PrintAIC(penaltyWeight, 105);
 	GaussianVarAmplitudePlusOffsetFifthResults.PrintAIC(penaltyWeight, 105);
+
+		//
+		// LET 5th residuals
+		//
+
+	gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	TCanvas* c = new TCanvas("c","c");
+	c->SetCanvasSize(9000, 5000);
+	c->SetFillStyle(4000);
+	c->SetFrameFillStyle(4000);
+	c->Divide(4,3,0.000000005,0.001);
+	auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
+	// auto legend = new TLegend(0.14,0.14,0.14+0.33,0.14+0.16);
+	legend->SetTextSize(0.05);
+
+	TAttLine lineStyle{};
+	lineStyle.SetLineColor(kGreen+2);
+
+	AlphaBetaMultigraphResidualsLET(c, legend, lineStyle, "LE2", H1437FittingParams, LE2FifthResults);
+	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/H1437_LET_residuals_LE2_fifth.jpg";
+	c->SaveAs((TString)outputName); 
+
 }
 
 void H1437_LET_Ceres()

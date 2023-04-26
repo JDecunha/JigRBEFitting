@@ -30,6 +30,7 @@
 //Functions for fitting and plotting
 #include "SurvivalPlotting.h"
 #include "Ceres_BWF_Fitter.h"
+#include "Ceres_Survival_Fitter.h"
 #include "AlphaBeta_Fitter.h"
 #include "BWF_Fitting_Results.h"
 #include "BWF_Plotter.h"
@@ -74,20 +75,20 @@ void SetupH1437SurvivalParameters()
 	survivingFractions.push_back(std::vector<double>{0.902409875,0.869594975,0.5845154625,0.47581609375,0.34455648125,0.319945294375,0.2563664075,0.1210049475,0.05742608});
 
 
-	//H1437 surviving fraction uncertainty (not yet filled out)
-	// std::vector<std::vector<double>> survivingFractionUncertainty;
-	// survivingFractionUncertainty.push_back(std::vector<double>{0.0973136077289898,0.103015986543154,0.103096420724027,0.107761376391554,0.0955386592610086,0.117579710048443,0.0695918896923402,0.0602326700663846,0.0489658382266086});
-	// survivingFractionUncertainty.push_back(std::vector<double>{0.109664062656694,0.114103383905432,0.106349029381286,0.100750909912505,0.104440896026642,0.115615500309136,0.0571078918837479,0.0596822436716957,0.0354580361405374});
-	// survivingFractionUncertainty.push_back(std::vector<double>{0.117538438828423,0.112939677206714,0.120312224123347,0.104189642227107,0.1110417317714,0.0699579930309851,0.058429879504437,0.0307981166308652,0.0143918780859903});
-	// survivingFractionUncertainty.push_back(std::vector<double>{0.116432603567846,0.0959351429808473,0.114867846060841,0.104554122926044,0.101609681173067,0.0806225179654492,0.0584744019992923,0.0206631372293671});
-	// survivingFractionUncertainty.push_back(std::vector<double>{0.107430799661687,0.112503375873942,0.118147015517618,0.101819298520923,0.0946038300253763,0.0919585883268045,0.06099555369411,0.0207280257711102});
-	// survivingFractionUncertainty.push_back(std::vector<double>{0.0977871206112248,0.100992226918609,0.115870692740975,0.0994505219983238,0.0929887914303216,0.0753478617253426,0.0313360366270534});
-	// survivingFractionUncertainty.push_back(std::vector<double>{0.120016044348618,0.112333967115251,0.0951047926938,0.0795554862324001,0.0768468409174345,0.0746030087767288,0.0246618969356351});
-	// survivingFractionUncertainty.push_back(std::vector<double>{0.117363566443651,0.105874866756647,0.0937622926169325,0.0809119467597451,0.0535464653407672,0.0418100763356018});
-	// survivingFractionUncertainty.push_back(std::vector<double>{0.0975556035780127,0.0760194642491641,0.055062426425359,0.0284367658829579,0.0190867076778482});
-	// survivingFractionUncertainty.push_back(std::vector<double>{0.10901048863062,0.0660380349795841,0.0342207978196262,0.0198752128828158});
-	// survivingFractionUncertainty.push_back(std::vector<double>{0.0756307934528414,0.0757123399282646,0.0522682804633686,0.0325580569599345,0.0162016671380295});
-	// survivingFractionUncertainty.push_back(std::vector<double>{0.101115832072717,0.0867612613187053,0.0816322353302927,0.0437450743705149,0.0291949733842577,0.0224833348620257});
+	//H1437 surviving fraction uncertainty (not yet filled out) //THESE ARE FAKE VALUES THEY ARE THE SAME AS THE
+	std::vector<std::vector<double>> survivingFractionUncertainty;
+	doses.push_back(std::vector<double>{0.4692676, 1.094958, 1.564225, 2.346338, 3.12845}); //5
+	doses.push_back(std::vector<double>{0.3903299, 0.7806598, 1.366155, 1.951649, 2.927474, 3.903299}); //6
+	doses.push_back(std::vector<double>{0.2615113,0.5230227,0.784534,1.046045,1.307557,1.569068,1.830579,2.092091,2.615113,3.92267,5.230227}); //11
+	doses.push_back(std::vector<double>{0.292021,0.584042,0.876063,1.168084,1.460105,1.752126,2.044147,2.336168,2.92021,4.380315,5.84042}); //11
+	doses.push_back(std::vector<double>{0.3109079,0.6218159,0.9327238,1.243632,1.55454,1.865448,2.176355,2.487263,3.109079,4.663619,6.218158}); //11
+	doses.push_back(std::vector<double>{0.3699901,0.7399802,1.10997,1.47996,1.849951,2.219941,2.589931,2.959921,3.699901,5.549852,7.399802}); //11
+	doses.push_back(std::vector<double>{0.4644248,0.9288495,1.393274,1.857699,2.322124,2.786549,3.250973,3.715398,4.644248,6.966372}); //10
+	doses.push_back(std::vector<double>{0.6198787,1.239757,1.859636,2.479515,3.099394,3.719272,4.339151,4.95903,6.198787}); //9
+	doses.push_back(std::vector<double>{0.8668616,1.733723,2.600585,3.467447,4.334308,5.20117,6.068032}); //7
+	doses.push_back(std::vector<double>{0.687678,1.375356,2.063034,2.750712,3.43839,4.126068,4.813745}); //7
+	doses.push_back(std::vector<double>{0.4281037,0.8562075,1.284311,1.712415,2.140519,2.568623,2.996726,3.42483}); //8
+	doses.push_back(std::vector<double>{0.2619956,0.5239912,0.7859868,1.047982,1.309978,1.571974,1.833969,2.095965,2.619956}); //9
 
 
 	//LETd for each experiment (from Fada's calculations)
@@ -747,18 +748,18 @@ void Fixed_Beta()
 		// Plotting the Mairani Residuals
 		//
 
-	// gStyle->SetOptStat(0); //Don't print the stats window in the top right
-	// TCanvas* c = new TCanvas("c","c");
-	// c->SetCanvasSize(9000, 5000);
-	// c->SetFillStyle(4000);
-	// c->SetFrameFillStyle(4000);
-	// c->Divide(4,3,0.000000005,0.001);
-	// auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
-	// // auto legend = new TLegend(0.14,0.14,0.14+0.33,0.14+0.16);
-	// legend->SetTextSize(0.05);
+	gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	TCanvas* c = new TCanvas("c","c");
+	c->SetCanvasSize(9000, 5000);
+	c->SetFillStyle(4000);
+	c->SetFrameFillStyle(4000);
+	c->Divide(4,3,0.000000005,0.001);
+	auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
+	// auto legend = new TLegend(0.14,0.14,0.14+0.33,0.14+0.16);
+	legend->SetTextSize(0.05);
 
-	// TAttLine lineStyle{};
-	// lineStyle.SetLineColor(kGreen+2);
+	TAttLine lineStyle{};
+	lineStyle.SetLineColor(kGreen+2);
 
 	// AlphaBetaMultigraphResiduals(c, legend, lineStyle, "Q", H1437FittingParams, QResults);
 	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_Q_fifth.jpg";
@@ -772,9 +773,9 @@ void Fixed_Beta()
 	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_QE_fifth.jpg";
 	// c->SaveAs((TString)outputName); 
 
-	// AlphaBetaMultigraphResiduals(c, legend, lineStyle, "LQE", H1437FittingParams, LQEResults);
-	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_LQE_fifth.jpg";
-	// c->SaveAs((TString)outputName); 
+	AlphaBetaMultigraphResiduals(c, legend, lineStyle, "LQE", H1437FittingParams, LQEResults);
+	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/H1437_residuals_LQE_fixed.jpg";
+	c->SaveAs((TString)outputName); 
 
 	// AlphaBetaMultigraphResiduals(c, legend, lineStyle, "LE2", H1437FittingParams, LE2Results);
 	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/residuals_LE2_fifth.jpg";
@@ -5991,7 +5992,97 @@ void H1437_Consecutive_Fitting()
 
 }
 
+void Survival_Fitting()
+{
+	SetupH1437SurvivalParameters();
+
+	AlphaBeta_Fitter fitter{};
+	fitter.SetCellStudyParameters(H1437FittingParams);
+	double* AlphaBeta = fitter.Fit(nullptr,false);
+
+	Ceres_Survival_Fitter CeresSurvival{};
+	CeresSurvival.SetCellStudyParameters(H1437FittingParams);
+	CeresSurvival.Initialize();
+	auto results = CeresSurvival.Fit();
+
+	results.PrintSummary();
+
+	gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	TCanvas* c = new TCanvas("c","c");
+	c->SetCanvasSize(9000, 5000);
+	c->SetFillStyle(4000);
+	c->SetFrameFillStyle(4000);
+	c->SetBottomMargin(0.13);
+	// c->Divide(4,3,0.000000005,0.001);
+	// auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
+	auto legend = new TLegend(0.08,0.72,0.08+0.27,0.72+0.23);
+	legend->SetTextSize(0.05);
+
+	TAttMarker markerAtts;
+	markerAtts.SetMarkerColor(kBlack);
+	markerAtts.SetMarkerSize(8);
+	markerAtts.SetMarkerStyle(8);
+	TAttLine lineStyle{};
+	lineStyle.SetLineWidth(5);
+	lineStyle.SetLineStyle(1);
+	lineStyle.SetLineColor(kBlack);
+
+	// PlotAlphaBeta(c, legend, "", markerAtts, "AP", H460FittingParams, AlphaBeta, false);
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/alpha_H460.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// PlotAlphaBeta(c, legend, "", markerAtts, "AP", H460FittingParams, AlphaBeta, true);
+	// outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/beta_H460.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	double* cesiumAlphaBeta = new double[2];
+	cesiumAlphaBeta[0] = 0.290; cesiumAlphaBeta[1] = 0.083;
+	PlotRBE10SF(c, legend, "Guan 2015", markerAtts, lineStyle, "AP", H1437FittingParams,cesiumAlphaBeta,AlphaBeta);
+
+
+	// Ceres_BWF_Fitter BWFFitter{};
+	// std::cout << std::endl << "Linear" << std::endl;
+	// BWFFitter.SetAlphaWeightingFunction(LinearBWF);
+	// // FixedBWF.SetValues(std::vector<double> {0.13}); //Give beta value before passing into the fitter
+	// // FifthBWF.SetValues(std::vector<double> {-3.62923e-21, -1.02135e-05, 0.00129381, -0.0357744, 0.220213, -0.107979});
+	// BWFFitter.SetBetaWeightingFunction(FixedBWF);
+	// BWFFitter.SetCellStudyParameters(H1437FittingParams);
+	// double penaltyWeight = 0.001; //0.01;
+	// BWFFitter.SetPositiveConstrained(true, penaltyWeight);
+	// BWFFitter.Initialize();
+
+	// std::cout << std::endl << "QE2" << std::endl;
+	// QE2BWF.SetValues(std::vector<double> {0.150172, -0.000226012, 0.000121788});
+	// BWFFitter.SetAlphaWeightingFunction(QE2BWF);
+	// FifthBWF.SetValues(std::vector<double> {0,0,8.29326e-06, 0.000106663, -0.0147373, 0.183807});
+	// BWFFitter.SetBetaWeightingFunction(FifthBWF);
+	// BWFFitter.Initialize();
+	// auto QE2Results = BWFFitter.Fit();
+	// QE2Results.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(QE2Results.alphaFunc);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(QE2Results.betaFunc);
+
+	// markerAtts.SetMarkerColor(kPink-6);
+	// markerAtts.SetMarkerStyle(23);
+	// PlotRBE10SF(c, legend, "QE2", markerAtts, "P", H1437FittingParams,cesiumAlphaBeta,QE2Results);
+
+	// markerAtts.SetMarkerColor(kGreen+2);
+	// lineStyle.SetLineWidth(10);
+	// lineStyle.SetLineStyle(3);
+	// lineStyle.SetLineColor(kSpring-7);
+	// PlotRBE10SFMcNamara(c, legend, "McNamara", markerAtts, lineStyle, "L", H1437FittingParams,cesiumAlphaBeta);
+	// lineStyle.SetLineColor(kYellow-7);
+	// PlotRBE10SFChenAndAhmad(c, legend, "Chen and Ahmad", markerAtts, lineStyle, "L", H1437FittingParams,cesiumAlphaBeta);
+	// lineStyle.SetLineColor(kGreen-7);
+	// PlotRBE10SFWedenberg(c, legend, "Wedenberg", markerAtts, lineStyle, "L", H1437FittingParams,cesiumAlphaBeta);
+
+	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/RBE_10_SF_H1437.jpg";
+	c->SaveAs((TString)outputName); 
+
+	// void PlotRBE10SF(TCanvas* c, TLegend* legend, std::string const& legendName, TAttMarker const& markerAttributes, std::string options, CellStudyBWFFittingParameters survivalParams, double const* alphaBetasCesium, double const* alphaBetasProton)
+}
+
 void H1437_Ceres()
 {
-	H1437_Consecutive_Fitting();
+	Survival_Fitting();
 }
