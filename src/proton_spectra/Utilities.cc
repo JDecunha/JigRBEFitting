@@ -53,6 +53,10 @@ std::string Utilities::GetFileEnergy(std::string filename)
 	std::stringstream pathsplitter(filename);
 	std::string output;
 
+	//This is a dumb workaround because of my naming convention on the new lineal energy library
+	std::getline(pathsplitter,output,'_');
+	std::getline(pathsplitter,output,'_');
+
 	while (std::getline(pathsplitter,output,'_'))
 	{
 		//Find and erase MeV
@@ -267,6 +271,35 @@ TH1D Utilities::GetNy(std::string path, double Energy, std::string TargetSize)
 	}
 
 	if (fileFound) { return output; } else {throw std::runtime_error("From Utilities::GetNy. Lineal energy histogram not found.");}
+}
+
+long long Utilities::GetEffectiveNumberOfTracks(std::string path, double Energy, std::string TargetSize)
+{
+	bool fileFound = false; //Will throw an exception if we don't find the file
+	long long effectiveNumTracks = 0;
+
+	//We have separated the files into different folders by target size. Specify that path.
+	path = path + "/" + TargetSize + "nm"; 
+
+	for (const auto &entry : std::filesystem::directory_iterator(path)) //Loop over all the files in the folder
+	{
+		double energy = std::stod(GetFileEnergy(entry.path().filename())); //Get the energy of the file
+
+		//Check if the energy is what we requested
+		if (std::fabs(Energy - energy) < 1e-6) //I wish this wasn't necessary. But subtraction of the energies never returns exactly zero
+		{
+			TFile f = TFile((TString)entry.path());
+			TNamed* tnNumTracks = (TNamed*)f.Get("Effective Number of Tracks"); 
+			if (tnNumTracks)
+			{
+				effectiveNumTracks = std::strtoll(tnNumTracks->GetTitle(), nullptr, 10);
+				fileFound = true;
+			}
+			break;
+		}
+	}
+
+	if (fileFound) { return effectiveNumTracks; } else {throw std::runtime_error("From Utilities::GetEffectiveNumberOfTracks. Lineal energy histogram not found.");}
 }
 
 void Utilities::PrintHistogram(const TH1& toPrint)

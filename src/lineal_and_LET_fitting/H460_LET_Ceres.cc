@@ -4592,5 +4592,5 @@ void Fifth_Beta()
 
 void H460_LET_Ceres()
 {
-	Quadratic_Beta();
+	Fifth_Beta();
 }

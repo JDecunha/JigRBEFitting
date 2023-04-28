@@ -22,6 +22,7 @@ namespace Utilities
 	std::string GetFileTargetSize(std::string filename);
 
 	TH1D GetNy(std::string path, double Energy, std::string TargetSize);
+	long long GetEffectiveNumberOfTracks(std::string path, double Energy, std::string TargetSize);
 	TH1D GetFy(std::string path, double Energy, std::string TargetSize);
 	TH1D GetDy(std::string path, double Energy, std::string TargetSize);
 

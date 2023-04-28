@@ -11,8 +11,9 @@
 
 int main()
 {
-	// auto out = LinealSpectra::GetKeWeightedFrequencyLinealSpectra("1e3");
-	// LinealSpectra::PlotKeWeightedLinealSpectra(out);
-	// LinealSpectra::SaveKeWeightedFrequencyLinealSpectra();
-	Uwes_Spectrum();
+	// auto keWeightedSpectra = LinealSpectra::GetKeWeightedFrequencyLinealSpectra("1e3");
+	// LinealSpectra::PlotKeWeightedLinealSpectraMultigraph(keWeightedSpectra);
+	// H460_LET_Ceres();
+	H1437_Ceres();
+	// H1437_LET_Ceres();
 };

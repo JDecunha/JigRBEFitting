@@ -107,7 +107,8 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedFrequencyLi
 	*/
 
 	//Specify hardcoded path to our f(y) library and target size
-	std::string fyFolder = "/home/joseph/Documents/PHD_local/July_2022/proton_5umVoxel_DNA2_10kTracks";
+	// std::string fyFolder = "/home/joseph/Documents/PHD_local/July_2022/proton_5umVoxel_DNA2_10kTracks";
+	std::string fyFolder = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_Microdosimetry/Data/5um_0to100MeV_April2023Library";
 
 
 	//Have to make a dictionary so that CERN ROOT can properly load and save STD library types from files
@@ -142,6 +143,11 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedFrequencyLi
 			//Scale the spectrum by the fluence
 			tempLinealSpectrum.Scale(KESpectrum.GetBinContent(i));
 
+			//Scale the spectrum so N(y) matches an effective count of 10 million
+			long long effectiveNumTracks = utils::GetEffectiveNumberOfTracks(fyFolder, KESpectrum.GetBinLowEdge(i), targetSize);
+			double scalingFactor = double(1e7)/double(effectiveNumTracks);
+			tempLinealSpectrum.Scale(scalingFactor);
+
 			//Add the weighted spectrum to the output fy spectrum
 			outputLinealSpectrum.Add(&tempLinealSpectrum);
 		}	
@@ -165,7 +171,7 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpect
 	*/
 
 	//Specify hardcoded path to our f(y) library and target size
-	std::string fyFolder = "/home/joseph/Documents/PHD_local/July_2022/proton_5umVoxel_DNA2_10kTracks";
+	std::string fyFolder = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_Microdosimetry/Data/5um_0to100MeV_April2023Library";
 
 
 	//Have to make a dictionary so that CERN ROOT can properly load and save STD library types from files
@@ -199,6 +205,11 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpect
 
 			//Scale the spectrum by the fluence
 			tempLinealSpectrum.Scale(KESpectrum.GetBinContent(i));
+
+			//Scale the spectrum so N(y) matches an effective count of 10 million
+			long long effectiveNumTracks = utils::GetEffectiveNumberOfTracks(fyFolder, KESpectrum.GetBinLowEdge(i), targetSize);
+			double scalingFactor = double(1e7)/double(effectiveNumTracks);
+			tempLinealSpectrum.Scale(scalingFactor);
 
 			//Add the weighted spectrum to the output fy spectrum
 			outputLinealSpectrum.Add(&tempLinealSpectrum);
@@ -341,7 +352,7 @@ void LinealSpectra::PlotKeWeightedLinealSpectraMultigraph(const std::vector<std:
 			t->Draw();
 	}
 
-	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/linealSpectra/multigraphJigLinealSpectra2.jpg";
+	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/linealSpectra/multigraphFyJigLinealApril2023.jpg";
 	c->SaveAs((TString)outputName);
 
 	delete c;
@@ -452,13 +463,14 @@ void LinealSpectra::SaveKeWeightedLinealSpectra()
 	gInterpreter->GenerateDictionary("pair<string,TH1D>;vector<pair<string,TH1D> >", "TH1.h;string;utility;vector");
 
 	//Get the KeWeighted lineal energy spectra
-	std::vector<std::string> targetSizes{"10","50","100","200","300","400","500","600","700","800","900","1e3"};
+	// std::vector<std::string> targetSizes{"10","50","100","200","300","400","500","600","700","800","900","1e3"};
+	std::vector<std::string> targetSizes{"1e3"};
 	for (const auto& value : targetSizes)
 	{
 		auto keWeightedSpectra = GetKeWeightedLinealSpectra(value);
 
 		//Open the file and write the value
-		TFile* keWeightedLinealSpectraOutputFile = TFile::Open((TString)("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealSpectraCellStudy_"+value+"nm.root"),"RECREATE");
+		TFile* keWeightedLinealSpectraOutputFile = TFile::Open((TString)("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealSpectraApril2023CellStudy_"+value+"nm.root"),"RECREATE");
 		keWeightedLinealSpectraOutputFile->WriteObject(&keWeightedSpectra, "Lineal_energy_library");
 
 		//Close the file
@@ -472,13 +484,14 @@ void LinealSpectra::SaveKeWeightedFrequencyLinealSpectra()
 	gInterpreter->GenerateDictionary("pair<string,TH1D>;vector<pair<string,TH1D> >", "TH1.h;string;utility;vector");
 
 	//Get the KeWeighted lineal energy spectra
-	std::vector<std::string> targetSizes{"10","50","100","200","300","400","500","600","700","800","900","1e3"};
+	// std::vector<std::string> targetSizes{"10","50","100","200","300","400","500","600","700","800","900","1e3"};
+	std::vector<std::string> targetSizes{"1e3"};
 	for (const auto& value : targetSizes)
 	{
 		auto keWeightedSpectra = GetKeWeightedFrequencyLinealSpectra(value);
 
 		//Open the file and write the value
-		TFile* keWeightedLinealSpectraOutputFile = TFile::Open((TString)("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealFYSpectraCellStudy_"+value+"nm.root"),"RECREATE");
+		TFile* keWeightedLinealSpectraOutputFile = TFile::Open((TString)("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealFYSpectraApril2023CellStudy_"+value+"nm.root"),"RECREATE");
 		keWeightedLinealSpectraOutputFile->WriteObject(&keWeightedSpectra, "Lineal_energy_library");
 
 		//Close the file

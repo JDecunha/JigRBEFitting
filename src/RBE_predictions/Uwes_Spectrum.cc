@@ -52,7 +52,8 @@ std::pair<std::vector<double>,std::vector<TH1F>> Import_Spectrum_and_Rebin()
 
 	//The output of this function
 	std::vector<double> distance = utils::Linspace(0.05,70.5, 70);
-	std::vector<TH1F> spectra;
+	TH1::AddDirectory(false); 
+	std::vector<TH1F> spectra; 
 
 	while (std::getline(spectrumFile,ReadoutLine)) //Split the file by lines
 	{
@@ -191,6 +192,26 @@ void PlotUwesProtonSpectra(std::pair<std::vector<double>,std::vector<TH1F>>& Uwe
 		distance += 0.1;
 	}
 	delete c;
+}
+
+void Plot_RBE_SF50_Uwes_Spectrum(std::pair<std::vector<double>,std::vector<TH1F>>& UwesSpectra)
+{
+	gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	TCanvas* c = new TCanvas("c","c");
+	c->SetCanvasSize(2040, 1640);
+	c->SetWindowSize(2040, 1640);
+	c->SetLeftMargin(0.15);
+	c->SetBottomMargin(0.15);
+
+	double distance = 0.05;
+
+	//Now let's iterate through our lineal energy library, plot, and do all that nice stuff
+	for (auto& protonSpectra:std::get<1>(UwesSpectra))
+	{
+
+	}
+
+
 }
 
 void Uwes_Spectrum()
