@@ -56,6 +56,7 @@ std::string Utilities::GetFileEnergy(std::string filename)
 	//This is a dumb workaround because of my naming convention on the new lineal energy library
 	std::getline(pathsplitter,output,'_');
 	std::getline(pathsplitter,output,'_');
+	std::getline(pathsplitter,output,'_');
 
 	while (std::getline(pathsplitter,output,'_'))
 	{

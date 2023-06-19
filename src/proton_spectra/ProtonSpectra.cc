@@ -131,6 +131,134 @@ TH1F ProtonSpectra::GetFadaSpectrumRebinned(const std::string& column)
 	return KE_spectrum_averaged;
 }
 
+TH1F ProtonSpectra::GetFadaSpectrumRebinnedSimple(const std::string& column)
+{
+	//
+	// This function represents a new methodology for rebinning Fada's spectrum
+	// for use with the proton tracks that actually span the bin energies
+	//
+
+	TH1::AddDirectory(kFALSE); //so that the TH1s don't get added to the global gDirectory by default
+
+	//Part 1.) Read Fada's data in and get it into a TH1F
+
+	//Laod the file into a TTree
+	TTree KEspectra = TTree("T","a collection of proton KE spectra");
+	KEspectra.ReadFile("/home/joseph/Documents/PHD_local/fada_data/protonKEspectra.csv"); //all variables will be floating point
+
+	//Make the TTreeReader
+	TTreeReader treeReader(&KEspectra);
+	TTreeReaderValue<Float_t> KeBin(treeReader,"KE_MeV");
+	TTreeReaderValue<Float_t> KeValue(treeReader,(TString)column);
+
+	//Make a vector to hold the bins
+	std::vector<double> KE_bins;
+
+	//Put the bins into the std::vector
+	while (treeReader.Next()) 
+	{
+		KE_bins.push_back(*KeBin);
+	}
+
+	//Make the TH1F with correct bins, it's currently empty
+	TH1F KE_spectrum = TH1F("KE Spectrum"," ",(KE_bins.size()-1), KE_bins.data());
+	treeReader.Restart(); //Restart the reader so it can run again again
+
+	//Fill the TH1F with values
+	while (treeReader.Next()) 
+	{
+		KE_spectrum.Fill(*KeBin,*KeValue); 
+
+	}
+
+	//Part 2.) Rebinning
+	//(Sorry to my future self that I find this very confusing)
+
+	/*
+	So, for rebinning, from 0.1-0.9 MeV, we just take the bin above and bin below and average them to get the bin "middle" best guess.
+	Since we're not actually creating or combining any new bins we want to keep the normalization as is.
+
+	It's okay that the 0.0 MeV bin only gets half counted, because we can consider half of it to be in the 0 MeV bin which we ignore.
+
+	For 1 MeV, we're taking the average of 0.9 - 1.4 MeV. 
+	For this, after the 0.9 MeV bin value in the new spectrum is calculated, we take the 0.9 MeV value from the original spectrum and halve its value. 
+	Then when we average from 0.9 MeV - 1.4 MeV we can multiply by 6 and preserve the same number of the total counts. 
+	(We are normalizing with the principle in mind, that say 0.9 MeV had 2 counts and the rest of the spectrum zero counts. 
+	When we perform averaging there should still be a total of two counts. I.e. we are preserving the total number of counts in the averaging.
+	Except for the 0 MeV bin, for reasons explained above.
+	You can convince yourself this works by working with the above example of 2 counts in 0.9 MeV and none anywhere else.)
+
+	For the Bins from 2-78 MeV we're taking 10 bins total and combining them into one. So the average should be multiplied by ten to keep the same number of total counts.
+	*/
+
+	//Create the newBins we want to output with
+	std::vector<double> newBins;
+	newBins.reserve(90); //pre-allocate memory so it's faster
+	std::vector<double> firstBinValues = utils::Linspace(0,0.9,10); //from 0-0.9 MeV
+	std::vector<double> lastBinValues = utils::Linspace(1,80,80); //from 1-80 MeV
+	//Insert the new bins into the vector
+	newBins.insert(newBins.end(),firstBinValues.begin(),firstBinValues.end()); 
+	newBins.insert(newBins.end(),lastBinValues.begin(),lastBinValues.end());
+
+	//New histogram
+	TH1F KE_spectrum_rebin = TH1F("KE Spectrum Rebinned"," ",(newBins.size()-1), newBins.data());
+	
+	//Part 2.1: Just copy the 0.0 - 0.9 (lower edge) MeV bins
+	for (int i = 1; i < 11; i++) 
+	{
+		//Just copy over these bins
+		KE_spectrum_rebin.Fill(KE_spectrum.GetBinLowEdge(i),KE_spectrum.GetBinContent(i));
+		// std::cout << "Bin low edge: " << KE_spectrum_rebin.GetBinLowEdge(i) << " Value : " << KE_spectrum_rebin.GetBinContent(i) << std::endl;
+	}
+
+	//Part 2.2: Now take the 1.0 MeV - 79.9 MeV lower edge bins and average them in groups of ten
+	for (int i = 0; i < 79; ++i) 
+	{
+		std::pair<float,float> binAverageAndCenter = utils::GetHistogramAverage(KE_spectrum, 11+(10*i), 11+9+(10*i)); //I hate using hardcoded numbers
+
+		if (std::get<1>(binAverageAndCenter) <= 80)
+		{
+			KE_spectrum_rebin.Fill(std::get<1>(binAverageAndCenter), std::get<0>(binAverageAndCenter)*10);
+			// std::cout << "Bin low edge: " << KE_spectrum_rebin.GetBinLowEdge(11+i) << " Value : " << KE_spectrum_rebin.GetBinContent(11+i) << std::endl;
+		}
+		else {std::cout << "bin out of range" << std::endl;}
+	}
+
+	// //Part 2.2: rebin 1 MeV. 1 MeV is the 'in between' bin, so average from 0.9-1.4 MeV
+	// KE_spectrum.SetBinContent(10, KE_spectrum.GetBinContent(10)*0.5); //Halve the 0.9 MeV bin
+	// std::pair<float,float> binAverageAndCenter = utils::GetHistogramAverage(KE_spectrum, 10, 15); //10th bin is 0.9, 15th is 1.4 MeV
+	// KE_spectrum_averaged.Fill(std::get<1>(binAverageAndCenter), std::get<0>(binAverageAndCenter)*6); //multiply by the 6 combined bins
+
+	// //Part 2.3: rebin from 2-79 MeV
+	// for (int i = 0; i < 78; ++i) 
+	// {
+	// 	std::pair<float,float> binAverageAndCenter = utils::GetHistogramAverage(KE_spectrum, 16+(10*i), 16+9+(10*i)); //I hate using hardcoded numbers
+
+	// 	if (std::get<1>(binAverageAndCenter) <= 79)
+	// 	{
+	// 		KE_spectrum_averaged.Fill(i+2, std::get<0>(binAverageAndCenter)*10);
+	// 	}
+	// 	else {std::cout << "bin out of range" << std::endl;}
+	// }
+ 
+	// //Part 3: Normalizing the spectrum (so it adds to 1)
+	float normalization = 0;
+
+	for (int i = 0; i <= KE_spectrum_rebin.GetNbinsX(); ++i) //calculate the normalization value
+	{
+		normalization += KE_spectrum_rebin.GetBinContent(i);
+	}
+
+	for (int i = 0; i <= KE_spectrum_rebin.GetNbinsX(); ++i) //normalize
+	{
+		float normalizedVal = KE_spectrum_rebin.GetBinContent(i)/normalization;
+		KE_spectrum_rebin.SetBinContent(i,normalizedVal);
+		//std::cout << KE_spectrum_averaged.GetBinCenter(i) << " " << KE_spectrum_averaged.GetBinContent(i) << std::endl;
+	}
+
+	return KE_spectrum_rebin;
+}
+
 TH1F ProtonSpectra::GetFadaKESpectrumRaw(const std::string& column)
 {
 	TH1::AddDirectory(kFALSE); //so that the TH1s don't get added to the global gDirectory by default
@@ -190,7 +318,7 @@ std::vector<std::pair<std::string,TH1F>> ProtonSpectra::GetFadaSpectraRebinned()
 
 	for (const auto& item:columns)
 	{
-		output.push_back(std::pair<std::string,TH1F>(item, GetFadaSpectrumRebinned(item)));
+		output.push_back(std::pair<std::string,TH1F>(item, GetFadaSpectrumRebinnedSimple(item)));
 	}
 
 	return output;
@@ -215,7 +343,7 @@ void ProtonSpectra::SaveFadaSpectra()
 {
 	gInterpreter->GenerateDictionary("pair<string,TH1F>;vector<pair<string,TH1F> >", "TH1.h;string;utility;vector");
 	auto spectra = ProtonSpectra::GetFadaSpectraRebinned();
-	TFile* spectrumFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/FadasProtonSpectra.root","RECREATE");
+	TFile* spectrumFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/FadasProtonSpectra_July2023.root","RECREATE");
 	spectrumFile->WriteObject(&spectra, "Spectrum_Library");
 	delete spectrumFile;
 }

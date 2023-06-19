@@ -9,6 +9,7 @@
 #include "LinealSpectra.h"
 #include "Utilities.h"
 #include "LETCalculator.h"
+#include "Uwes_Spectrum.h"
 
 std::pair<std::vector<double>,std::vector<double>> PullStoppingPowersFromCsv()
 {
@@ -260,6 +261,64 @@ void ComputeLETsTakeThree()
 
 };
 
+std::vector<std::pair<float,float>> ComputeUwesLETs()
+{
+	// Step 1.) Get the Stopping Power Values
+	std::pair<std::vector<double>,std::vector<double>> NISTPSTAR = PullStoppingPowersFromCsvAndInterpolate();
+
+	// Step 2.) Pull all of the fluence spectra
+	std::vector<std::pair<float,TH1F>> spectra = Import_Spectrum_and_Rebin_01MeV();
+
+	std::vector<std::pair<float,float>> output;	
+
+	// Step 3.) Compute LET for each fluence spectrum
+	for (auto& pair:spectra) //For every set of fluence spectra that we have
+	{
+
+		TH1F spectrum = std::get<1>(pair); //Grab the fluence spectrum
+		double LETTopSummation = 0; double LETBottomSummation = 0; //Accumulators
+
+		for (int i = 1; i < spectrum.GetNbinsX(); ++i) //start at 1 to skip underflow
+		{
+
+			//Because we haven't rebinnned Fada's spectrum, we interpolate the bins to get the midpoints
+			double keSpectrumEnergy = (spectrum.GetBinCenter(i)+spectrum.GetBinCenter(i+1))/2.; 
+			// std::cout << keSpectrumEnergy << std::endl;
+			double keSpectrumBinValue = (spectrum.GetBinContent(i)+spectrum.GetBinContent(i+1))/2.;
+
+			for (int pStarLoopIndex = 0; pStarLoopIndex < std::get<0>(NISTPSTAR).size(); ++pStarLoopIndex) //Loop over PSTAR to find the Stopping power
+			{
+
+				double pStarEnergyValue = std::get<0>(NISTPSTAR)[pStarLoopIndex];
+
+				if (std::fabs(pStarEnergyValue - keSpectrumEnergy) < 0.001) //We found entry in PSTAR if true
+				{
+
+					double pStarStoppingPower = std::get<1>(NISTPSTAR)[pStarLoopIndex];
+
+					//Add to the accumulators
+					LETTopSummation += pStarStoppingPower*pStarStoppingPower*keSpectrumBinValue;
+					LETBottomSummation += pStarStoppingPower*keSpectrumBinValue;
+
+					// std::cout << "Match found" << keSpectrumEnergy << ", " << pStarEnergyValue << std::endl;
+
+					break; //We found it, we can end the for loop
+
+				}
+			}
+		}	
+
+		//Accumulators are done, actually sum LET
+		float distance = std::get<0>(pair);
+		double LETd = LETTopSummation*0.1/LETBottomSummation;
+		std::cout << std::get<0>(pair) << ", LETd: " << LETd << std::endl;
+		output.push_back(std::make_pair<float,float>(std::move(distance),LETd));
+	}
+
+	return output;
+
+};
+
 void LETCalcMain()
 {
 	// std::cout << "Take  one: " << std::endl;
@@ -267,5 +326,5 @@ void LETCalcMain()
 	// std::cout << "\nTake two: " << std::endl;
 	// ComputeLETsTakeTwo();
 
-	ComputeLETsTakeThree();
+	// ComputeUwesLETs();
 }

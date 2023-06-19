@@ -2,6 +2,9 @@
 #include "LinealSpectra.h"
 #include "Utilities.h"
 
+#include <iostream>
+#include <fstream>
+
 namespace utils = Utilities; //namespace alias
 
 std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetMonoenergeticLinealSpectra()
@@ -226,6 +229,69 @@ std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpect
 	return linealEnergyLibrary;
 }
 
+std::vector<std::pair<std::string,TH1D>> LinealSpectra::GetKeWeightedLinealSpectraJuly2023(std::string targetSize)
+{
+	/*
+	Retrieves the lineal energy spectra calculated at every location of the jig.
+	Returns a series of d(y) with jig location identifier.
+	*/
+
+	//Specify hardcoded path to our f(y) library and target size
+	std::string fyFolder = "/home/joseph/Documents/PHD_local/SuperTrack_01to100MeV_June2023_binspanning";
+
+	//Have to make a dictionary so that CERN ROOT can properly load and save STD library types from files
+	gInterpreter->GenerateDictionary("pair<string,TH1F>;vector<pair<string,TH1F> >", "TH1.h;string;utility;vector");
+
+	//Pull the data from our KE-spectrum file
+	std::vector<std::pair<std::string,TH1F>>* keSpectra;
+	TFile* spectrumFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/FadasProtonSpectra_July2023.root");
+	spectrumFile->GetObject("Spectrum_Library",keSpectra);
+	spectrumFile->Close();
+	
+	//This will hold the output
+	std::vector<std::pair<std::string,TH1D>> linealEnergyLibrary; 
+	
+	for(const auto& spectra:*keSpectra)
+	{
+		//Step 1: Weight the lineal energy spectrum by the KE spectrum.
+		//Grab the KE specta for a given irradiation
+		TH1F KESpectrum = std::get<1>(spectra);
+		std::string KEColumnName = std::get<0>(spectra);
+
+		//Just get the bins for the output spectrum
+		TH1D outputLinealSpectrum = utils::GetDy(fyFolder, 0.15, targetSize);
+		outputLinealSpectrum.Scale(0); //to eliminate the data and leave the bins
+
+		//Loop over the KE spectrum and weight the f(y) spectra accordingly
+		for (int i = 1; i <= KESpectrum.GetNbinsX(); ++i) //start at 2 to skip underflow and 0.0 MeV bin
+		{
+			//Because of the way we re-defined the KE histogram, "GetBinLowEdge" actually corresponds to the middle
+			// std::cout << KESpectrum.GetBinCenter(i) << std::endl;
+			TH1D tempLinealSpectrum = utils::GetNy(fyFolder, KESpectrum.GetBinCenter(i), targetSize); //Get the N(y) spectrum at that energy
+
+			//Scale the spectrum by the fluence
+			tempLinealSpectrum.Scale(KESpectrum.GetBinContent(i));
+
+			//Scale the spectrum so N(y) matches an effective count of 10 million
+			long long effectiveNumTracks = utils::GetEffectiveNumberOfTracks(fyFolder, KESpectrum.GetBinCenter(i), targetSize);
+			double scalingFactor = double(1e7)/double(effectiveNumTracks);
+			tempLinealSpectrum.Scale(scalingFactor);
+
+			//Add the weighted spectrum to the output fy spectrum
+			outputLinealSpectrum.Add(&tempLinealSpectrum);
+		}	
+		
+		//Convert N(y) to d(y)
+		utils::PMF_to_DoseFunction(&outputLinealSpectrum);
+		//utils::VerifyNormalization(outputLinealSpectrum); //Shows all spectra are normalized to 1 within 1e-7
+		linealEnergyLibrary.push_back(std::make_pair<std::string,TH1D>(std::move(KEColumnName),std::move(outputLinealSpectrum)));
+	}
+
+	delete keSpectra; //we own the keSpectra pointer so we have to delete it
+
+	return linealEnergyLibrary;
+}
+
 void LinealSpectra::PlotKeWeightedLinealSpectra(const std::vector<std::pair<std::string,TH1D>>& linealLibrary)
 {
 	gStyle->SetOptStat(0); //Don't print the stats window in the top right
@@ -352,7 +418,7 @@ void LinealSpectra::PlotKeWeightedLinealSpectraMultigraph(const std::vector<std:
 			t->Draw();
 	}
 
-	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/linealSpectra/multigraphFyJigLinealApril2023.jpg";
+	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/linealSpectra/multigraphDyJigLinealJuly2023.jpg";
 	c->SaveAs((TString)outputName);
 
 	delete c;
@@ -467,14 +533,50 @@ void LinealSpectra::SaveKeWeightedLinealSpectra()
 	std::vector<std::string> targetSizes{"1e3"};
 	for (const auto& value : targetSizes)
 	{
-		auto keWeightedSpectra = GetKeWeightedLinealSpectra(value);
+		auto keWeightedSpectra = GetKeWeightedLinealSpectraJuly2023(value);
 
 		//Open the file and write the value
-		TFile* keWeightedLinealSpectraOutputFile = TFile::Open((TString)("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealSpectraApril2023CellStudy_"+value+"nm.root"),"RECREATE");
+		TFile* keWeightedLinealSpectraOutputFile = TFile::Open((TString)("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealSpectraJuly2023CellStudy_"+value+"nm.root"),"RECREATE");
 		keWeightedLinealSpectraOutputFile->WriteObject(&keWeightedSpectra, "Lineal_energy_library");
 
 		//Close the file
 		keWeightedLinealSpectraOutputFile->Close();
+	}
+}
+
+void LinealSpectra::SaveKeWeightedLinealSpectraCSV()
+{
+	//Add entry to the dictionary so ROOT can read and save files with the given std library type
+	gInterpreter->GenerateDictionary("pair<string,TH1D>;vector<pair<string,TH1D> >", "TH1.h;string;utility;vector");
+
+	//Get the KeWeighted lineal energy spectra
+	// std::vector<std::string> targetSizes{"10","50","100","200","300","400","500","600","700","800","900","1e3"};
+	std::vector<std::string> targetSizes{"1e3"};
+	for (const auto& value : targetSizes)
+	{
+		auto keWeightedSpectra = GetKeWeightedLinealSpectraJuly2023(value);
+
+		for (const auto& linealSpectra:keWeightedSpectra)
+		{
+			//Get the spectra and its ID
+			TH1D* spectra = new TH1D(std::get<1>(linealSpectra));
+			auto columnName = std::get<0>(linealSpectra);
+
+			std::ofstream myfile;
+			myfile.open ("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/dyCSV/dySpectrum_"+columnName+".csv");
+			int length = spectra->GetNbinsX(); //get length
+
+			for (int i = 1; i <= length; i++) 
+			{
+				auto value = spectra->GetBinContent(i);
+				double low_edge = spectra->GetBinLowEdge(i);
+				myfile << std::setprecision(6) << low_edge << "," <<  value <<"\n";
+
+			}
+
+			myfile.close();
+		}
+
 	}
 }
 
