@@ -626,7 +626,7 @@ void PlotRBE10SFMcNamara(TCanvas* c, TLegend* legend, std::string const& legendN
 	gr->GetXaxis()->SetTitleSize(0.052);
 	gr->GetYaxis()->SetTitleSize(0.058);
 	gr->GetYaxis()->SetTitleOffset(0.65);
-	gr->GetYaxis()->SetRangeUser(0.8,4); //set the new y Limits
+	gr->GetYaxis()->SetRangeUser(0.8,4.5); //set the new y Limits
 
 	gr->SetMarkerColor(markerAttributes.GetMarkerColor());
 	gr->SetMarkerSize(markerAttributes.GetMarkerSize());

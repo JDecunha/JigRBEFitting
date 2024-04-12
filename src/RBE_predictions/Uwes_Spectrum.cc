@@ -384,6 +384,71 @@ std::vector<std::pair<float,TH1D>> GetUwesKeWeightedFrequencyLinealSpectra(std::
 	return linealEnergyLibrary;
 }
 
+std::vector<std::pair<float,TH1D>> GetUwesKeWeightedDoseLinealSpectra(std::string targetSize)
+{
+	/*
+	Retrieves the lineal energy spectra from Uwes first spectrum
+	*/
+
+	//Specify hardcoded path to our f(y) library and target size
+	// std::string fyFolder = "/home/joseph/Documents/PHD_local/July_2022/proton_5umVoxel_DNA2_10kTracks";
+	std::string fyFolder = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_Microdosimetry/Data/5um_0to100MeV_April2023Library";
+
+	//Have to make a dictionary so that CERN ROOT can properly load and save STD library types from files
+	gInterpreter->GenerateDictionary("pair<float,TH1F>;vector<pair<float,TH1F> >","TH1.h;utility;vector");
+
+	//Pull the data from our KE-spectrum file
+	std::vector<std::pair<float,TH1F>>* keSpectra;
+	TFile* spectrumFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/UwesFirstProtonSpectra.root");
+	spectrumFile->GetObject("Spectrum_Library",keSpectra);
+	spectrumFile->Close();
+	
+	//This will hold the output
+	std::vector<std::pair<float,TH1D>> linealEnergyLibrary; 
+
+	
+	for(const auto& spectra:*keSpectra)
+	{
+		//Step 1: Weight the lineal energy spectrum by the KE spectrum.
+		//Grab the KE specta for a given irradiation
+		TH1F KESpectrum = std::get<1>(spectra);
+		double KEDistance = std::get<0>(spectra);
+
+		//Just get the bins for the output spectrum
+		TH1D outputLinealSpectrum = utils::GetFy(fyFolder, 0.1, targetSize);
+		outputLinealSpectrum.Scale(0); //to eliminate the data and leave the bins
+
+		//Loop over the KE spectrum and weight the f(y) spectra accordingly
+		for (int i = 1; i <= KESpectrum.GetNbinsX(); ++i) //start at 1 to skip underflow
+		{
+			//Because of the way we re-defined the KE histogram, high edge actually corresponds to the middle
+			double highEdge = KESpectrum.GetBinLowEdge(i) + KESpectrum.GetBinWidth(i);
+			TH1D tempLinealSpectrum = utils::GetNy(fyFolder, highEdge, targetSize); //Get the N(y) spectrum at that energy
+
+			//Scale the spectrum by the fluence
+			tempLinealSpectrum.Scale(KESpectrum.GetBinContent(i));
+
+			//Scale the spectrum so N(y) matches an effective count of 10 million
+			long long effectiveNumTracks = utils::GetEffectiveNumberOfTracks(fyFolder, highEdge, targetSize);
+			double scalingFactor = double(1e7)/double(effectiveNumTracks);
+			tempLinealSpectrum.Scale(scalingFactor);
+
+			//Add the weighted spectrum to the output fy spectrum
+			outputLinealSpectrum.Add(&tempLinealSpectrum);
+		}	
+		
+		//Convert N(y) to f(y)
+		utils::PMF_to_DoseFunction(&outputLinealSpectrum);
+		//utils::VerifyNormalization(outputLinealSpectrum); //Shows all spectra are normalized to 1 within 1e-7
+		linealEnergyLibrary.push_back(std::make_pair<float,TH1D>(std::move(KEDistance),std::move(outputLinealSpectrum)));
+	}
+
+	delete keSpectra; //we own the keSpectra pointer so we have to delete it
+
+	return linealEnergyLibrary;
+}
+
+
 void  PlotKeWeightedLinealSpectra(const std::vector<std::pair<float,TH1D>>& linealLibrary)
 {
 	gStyle->SetOptStat(0); //Don't print the stats window in the top right
@@ -419,7 +484,7 @@ void  PlotKeWeightedLinealSpectra(const std::vector<std::pair<float,TH1D>>& line
 			//Set axis settings
 			spectra->SetTitle("");
 			spectra->SetTitleSize(0.03,"t"); //this doesn't do anything
-			spectra->GetYaxis()->SetTitle("y #upoint f(y)");
+			spectra->GetYaxis()->SetTitle("y #upoint d(y)");
 			spectra->GetXaxis()->SetTitle("y [#frac{keV}{#mum}]");
 			spectra->GetXaxis()->CenterTitle(true);
 			spectra->GetYaxis()->CenterTitle(true);
@@ -491,6 +556,7 @@ void Plot_RBE_SF10_Uwes_Spectrum(TCanvas* c, TLegend* legend, std::string const&
 		
 		alphaBetasProton.push_back(alphaValue);
 		alphaBetasProton.push_back(betaValue);
+		std::cout << "Alpha proton: " << alphaValue << "Beta proton: " << betaValue << std::endl;
 
 		++i;
 	}
@@ -534,7 +600,7 @@ void Plot_RBE_SF10_Uwes_Spectrum(TCanvas* c, TLegend* legend, std::string const&
 	// gPad->SetLogy(); //set the new y Limits
 	
 
-	gr->GetXaxis()->SetRangeUser(0,48); //set the new x Limits
+	gr->GetXaxis()->SetRangeUser(0,50); //set the new x Limits
 	gr->GetYaxis()->SetRangeUser(0,5.5); //set the new y Limits
 	
 
@@ -611,15 +677,16 @@ void Plot_RBE_SF10_Uwes_Spectrum_LET(TCanvas* c, TLegend* legend, std::string co
 	if (!legendAdded) { legend->AddEntry(gr, (TString)legendName, "P"); legendAdded = true; legend->Draw(); }
 }
 
-void Uwes_Spectrum()
+void CubicLET_vsMorstin()
 {
 	// auto UwesSpectrumLibrary = Import_Spectrum_and_Rebin_01MeV();
 	// PlotUwesProtonSpectra(UwesSpectrumLibrary);
-	auto uwesLib = GetUwesKeWeightedFrequencyLinealSpectra("1e3");
+	auto uwesLib = GetUwesKeWeightedDoseLinealSpectra("1e3");
+	PlotKeWeightedLinealSpectra(uwesLib);
 	// PlotKeWeightedLinealSpectra(uwesLib);
 
 	double* cesiumAlphaBeta = new double[2];
-	cesiumAlphaBeta[0] = 0.05; cesiumAlphaBeta[1] = 0.041;
+	cesiumAlphaBeta[0] = 0.290; cesiumAlphaBeta[1] = 0.083;
 
 	gStyle->SetOptStat(0); //Don't print the stats window in the top right
 	TCanvas* c = new TCanvas("c","c");
@@ -629,44 +696,130 @@ void Uwes_Spectrum()
 	c->SetBottomMargin(0.13);
 	// c->Divide(4,3,0.000000005,0.001);
 	// auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
-	auto legend = new TLegend(0.14,0.76,0.14+0.23,0.62+0.23);
+	auto legend = new TLegend(0.14,0.74,0.14+0.20,0.74+0.15);
 	legend->SetTextSize(0.04);
 	TAttMarker markerAtts;
 	TAttLine lineStyle{};
 	markerAtts.SetMarkerSize(10);
 
-	//Create cubic BWF
-	BiologicalWeightingFunction CubicBWF;
-	BWF_Fitting_Results CubicCubicFyBestResults;
-	CubicBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[3]*linealEnergy*linealEnergy*linealEnergy)+(params[2]*linealEnergy*linealEnergy)+(params[1]*linealEnergy)+params[0]);}, 4);
-	CubicBWF.SetValues(std::vector<double> {0.00013752, -0.00399419, 0.0252074, 0.0564586});
-	CubicCubicFyBestResults.alphaFunc = CubicBWF;
-	CubicBWF.SetValues(std::vector<double> {9.41183e-06, -0.000406718, 0.00310442, 0.0296854});
-	CubicCubicFyBestResults.betaFunc = CubicBWF;
 
-	markerAtts.SetMarkerColor(kViolet+4);
-	markerAtts.SetMarkerStyle(20);
-	Plot_RBE_SF10_Uwes_Spectrum(c, legend, "f(y) spectrum", markerAtts, "AP", uwesLib,cesiumAlphaBeta,CubicCubicFyBestResults);
+	
+	BiologicalWeightingFunction MorstinBWF;
+	BWF_Fitting_Results MorstinLinearDyBestResults;
+	MorstinBWF.SetWeightingFunction([](double const* params, double linealEnergy) 
+	{
+		return params[0]*((1-std::exp(-linealEnergy*params[1]-params[2]*linealEnergy*linealEnergy-params[3]*linealEnergy*linealEnergy*linealEnergy))/linealEnergy);
+	}, 4);
+	MorstinBWF.SetValues(std::vector<double> {1.33638439092475e-06, -2.98606802538980e-05, 0.000137006580329845, 3010.90150042332});
+	BiologicalWeightingFunction FixedBWF;
+	FixedBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return params[0];}, 1);
+	FixedBWF.SetValues(std::vector<double> {0.111377434741229});
+	MorstinLinearDyBestResults.alphaFunc = MorstinBWF;
+	MorstinLinearDyBestResults.betaFunc = FixedBWF;
 
-	//Create LE2 BWF
-	BiologicalWeightingFunction LE2BWF;
-	LE2BWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[0]*linealEnergy)*std::exp(-params[1]*linealEnergy*linealEnergy)+params[2]);}, 3);
-	LE2BWF.SetValues(std::vector<double> {0.0941433, -0.00583604, 0.00233011});
+	markerAtts.SetMarkerColor(kPink-6);
+	markerAtts.SetMarkerStyle(34);
+	Plot_RBE_SF10_Uwes_Spectrum(c, legend, "d(y) - Morstin", markerAtts, "AP", uwesLib,cesiumAlphaBeta,MorstinLinearDyBestResults);
 
-	//Fifth order poly BWF
-	BiologicalWeightingFunction FifthBWF;
-	FifthBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[5]*linealEnergy*linealEnergy*linealEnergy*linealEnergy*linealEnergy)+(params[4]*linealEnergy*linealEnergy*linealEnergy*linealEnergy)+(params[3]*linealEnergy*linealEnergy*linealEnergy)+(params[2]*linealEnergy*linealEnergy)+(params[1]*linealEnergy)+params[0]);}, 6);
-	FifthBWF.SetValues(std::vector<double> {1.10568e-06, -4.67063e-05, 0.000773506, -0.00602498, 0.0228525, 0.00195857});
+	
 
-	BWF_Fitting_Results BestLETH1437;
-	BestLETH1437.alphaFunc = LE2BWF;
-	BestLETH1437.betaFunc = FifthBWF;
+
+	BiologicalWeightingFunction GaussianPlusOffsetBWF;
+	BWF_Fitting_Results GaussianDyBestResults;
+	GaussianPlusOffsetBWF.SetWeightingFunction( [] (double const* params, double linealEnergy) 
+	{ 
+		return (((params[0])*std::exp(-((linealEnergy-params[1])*(linealEnergy-params[1]))/(params[2]*params[2]*2)))+params[3]); 
+	}
+	, 4);
+	GaussianPlusOffsetBWF.SetValues(std::vector<double>  {  0.230491501205610, 5.51962016177844,114.092470171093,95.2590461228117 });
+	FixedBWF.SetValues(std::vector<double> {0.101961735572583});
+	GaussianDyBestResults.alphaFunc = GaussianPlusOffsetBWF;
+	GaussianDyBestResults.betaFunc = FixedBWF;
+
+	markerAtts.SetMarkerColor(kAzure+2);
+	markerAtts.SetMarkerStyle(22);
+	Plot_RBE_SF10_Uwes_Spectrum(c, legend, "d(y) - Gaussian", markerAtts, "P", uwesLib,cesiumAlphaBeta,GaussianDyBestResults);
+
+	// Alpha fit params: 0.209024, -0.105069, 0.000636537 (QE)
+	// Beta fit params: 0.114731
+
+	BiologicalWeightingFunction QEBWF;
+	QEBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[0]*linealEnergy*linealEnergy)*std::exp(-params[1]*linealEnergy)+params[2]);}, 3);
+	QEBWF.SetValues(std::vector<double>  {  0.209024, -0.105069, 0.000636537 });
+	FixedBWF.SetValues(std::vector<double> {0.114731});
+	BWF_Fitting_Results BestLETH460;
+	BestLETH460.alphaFunc = QEBWF;
+	BestLETH460.betaFunc = FixedBWF;
 
 	auto LETLibrary = ComputeUwesLETs();
-	markerAtts.SetMarkerColor(kTeal+3);
-	markerAtts.SetMarkerStyle(34);
-	Plot_RBE_SF10_Uwes_Spectrum_LET(c, legend, "LET_{d}", markerAtts, "P", LETLibrary,cesiumAlphaBeta,BestLETH1437);
+	markerAtts.SetMarkerColor(kGray+3);
+	markerAtts.SetMarkerSize(8);
+	markerAtts.SetMarkerStyle(8);
+	Plot_RBE_SF10_Uwes_Spectrum_LET(c, legend, "LET_{d}", markerAtts, "P", LETLibrary,cesiumAlphaBeta,BestLETH460);
 
-	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/RBE_10_SF_Uwes_H1437_notitle.jpg";
+	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/RBE_10_SF_Uwes_H460_Morstin.jpg";
 	c->SaveAs((TString)outputName); 
+}
+
+void Uwes_Spectrum()
+{
+	CubicLET_vsMorstin();
+
+
+// 	// auto UwesSpectrumLibrary = Import_Spectrum_and_Rebin_01MeV();
+// 	// PlotUwesProtonSpectra(UwesSpectrumLibrary);
+// 	auto uwesLib = GetUwesKeWeightedFrequencyLinealSpectra("1e3");
+// 	// PlotKeWeightedLinealSpectra(uwesLib);
+
+// 	double* cesiumAlphaBeta = new double[2];
+// 	cesiumAlphaBeta[0] = 0.05; cesiumAlphaBeta[1] = 0.041;
+
+// 	gStyle->SetOptStat(0); //Don't print the stats window in the top right
+// 	TCanvas* c = new TCanvas("c","c");
+// 	c->SetCanvasSize(9000, 5000);
+// 	c->SetFillStyle(4000);
+// 	c->SetFrameFillStyle(4000);
+// 	c->SetBottomMargin(0.13);
+// 	// c->Divide(4,3,0.000000005,0.001);
+// 	// auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
+// 	auto legend = new TLegend(0.14,0.76,0.14+0.23,0.62+0.23);
+// 	legend->SetTextSize(0.04);
+// 	TAttMarker markerAtts;
+// 	TAttLine lineStyle{};
+// 	markerAtts.SetMarkerSize(10);
+
+// 	//Create cubic BWF
+// 	BiologicalWeightingFunction CubicBWF;
+// 	BWF_Fitting_Results CubicCubicFyBestResults;
+// 	CubicBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[3]*linealEnergy*linealEnergy*linealEnergy)+(params[2]*linealEnergy*linealEnergy)+(params[1]*linealEnergy)+params[0]);}, 4);
+// 	CubicBWF.SetValues(std::vector<double> {0.00013752, -0.00399419, 0.0252074, 0.0564586});
+// 	CubicCubicFyBestResults.alphaFunc = CubicBWF;
+// 	CubicBWF.SetValues(std::vector<double> {9.41183e-06, -0.000406718, 0.00310442, 0.0296854});
+// 	CubicCubicFyBestResults.betaFunc = CubicBWF;
+
+// 	markerAtts.SetMarkerColor(kViolet+4);
+// 	markerAtts.SetMarkerStyle(20);
+// 	Plot_RBE_SF10_Uwes_Spectrum(c, legend, "f(y) spectrum", markerAtts, "AP", uwesLib,cesiumAlphaBeta,CubicCubicFyBestResults);
+
+// 	//Create LE2 BWF
+// 	BiologicalWeightingFunction LE2BWF;
+// 	LE2BWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[0]*linealEnergy)*std::exp(-params[1]*linealEnergy*linealEnergy)+params[2]);}, 3);
+// 	LE2BWF.SetValues(std::vector<double> {0.0941433, -0.00583604, 0.00233011});
+
+// 	//Fifth order poly BWF
+// 	BiologicalWeightingFunction FifthBWF;
+// 	FifthBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[5]*linealEnergy*linealEnergy*linealEnergy*linealEnergy*linealEnergy)+(params[4]*linealEnergy*linealEnergy*linealEnergy*linealEnergy)+(params[3]*linealEnergy*linealEnergy*linealEnergy)+(params[2]*linealEnergy*linealEnergy)+(params[1]*linealEnergy)+params[0]);}, 6);
+// 	FifthBWF.SetValues(std::vector<double> {1.10568e-06, -4.67063e-05, 0.000773506, -0.00602498, 0.0228525, 0.00195857});
+
+// 	BWF_Fitting_Results BestLETH1437;
+// 	BestLETH1437.alphaFunc = LE2BWF;
+// 	BestLETH1437.betaFunc = FifthBWF;
+
+// 	auto LETLibrary = ComputeUwesLETs();
+// 	markerAtts.SetMarkerColor(kTeal+3);
+// 	markerAtts.SetMarkerStyle(34);
+// 	Plot_RBE_SF10_Uwes_Spectrum_LET(c, legend, "LET_{d}", markerAtts, "P", LETLibrary,cesiumAlphaBeta,BestLETH1437);
+
+// 	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/RBE_10_SF_Uwes_H1437_notitle.jpg";
+// 	c->SaveAs((TString)outputName); 
 }

@@ -6014,59 +6014,95 @@ void Survival_Fitting()
 	c->SetBottomMargin(0.13);
 	// c->Divide(4,3,0.000000005,0.001);
 	// auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
-	auto legend = new TLegend(0.14,0.64,0.14+0.23,0.72+0.23);
+	auto legend = new TLegend(0.14,0.64,0.14+0.31,0.72+0.23);
 	legend->SetTextSize(0.04);
 
 	TAttMarker markerAtts;
-	TAttLine lineStyle{};
 
 	markerAtts.SetMarkerSize(10);
+	
+	TAttLine lineStyle{};
+	lineStyle.SetLineWidth(5);
+	lineStyle.SetLineStyle(1);
 
-	lineStyle.SetLineWidth(14);
-	gStyle->SetLineStyleString(11,"400 100");
-	lineStyle.SetLineStyle(11);
-	lineStyle.SetLineColor(kRed-6);
-	PlotRBE10SFMcNamara(c, legend, "McNamara", markerAtts, lineStyle, "AL", H1437FittingParams,cesiumAlphaBeta);
-	lineStyle.SetLineColor(kAzure-8);
-	PlotRBE10SFChenAndAhmad(c, legend, "Chen and Ahmad", markerAtts, lineStyle, "L", H1437FittingParams,cesiumAlphaBeta);
-	lineStyle.SetLineColor(kGreen-8);
-	PlotRBE10SFWedenberg(c, legend, "Wedenberg", markerAtts, lineStyle, "L", H1437FittingParams,cesiumAlphaBeta);
+	// auto results = CeresSurvival.Fit();
+
+	// SurvivalDataMultigraph(c, legend, H460FittingParams);
+	// lineStyle.SetLineColor(kRed+2);
+	// lineStyle.SetLineWidth(5);
+	// lineStyle.SetLineStyle(1);
+	// MultigraphSurvivalFitPlotter(c, legend, lineStyle, "DirectFit", H460FittingParams, AlphaBeta);
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/DirectFitH460.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// results.PrintSummary();
+	
+
+	// PlotAlphaBeta(c, legend, "", markerAtts, "AP", H460FittingParams, AlphaBeta, false);
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/alpha_H460.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// gStyle->SetOptStat(0); //Don't print the stats window in the top right
+	// TCanvas* c = new TCanvas("c","c");
+	// c->SetCanvasSize(9000, 5000);
+	// c->SetFillStyle(4000);
+	// c->SetFrameFillStyle(4000);
+	// c->SetBottomMargin(0.13);
+	// // c->Divide(4,3,0.000000005,0.001);
+	// // auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
+	// auto legend = new TLegend(0.14,0.64,0.14+0.23,0.72+0.23);
+	// legend->SetTextSize(0.04);
+
+	// TAttMarker markerAtts;
+	// TAttLine lineStyle{};
+
+	// markerAtts.SetMarkerSize(10);
+
+	// lineStyle.SetLineWidth(14);
+	// gStyle->SetLineStyleString(11,"400 100");
+	// lineStyle.SetLineStyle(11);
+	// lineStyle.SetLineColor(kRed-6);
+	// PlotRBE10SFMcNamara(c, legend, "McNamara", markerAtts, lineStyle, "AL", H1437FittingParams,cesiumAlphaBeta);
+	// lineStyle.SetLineColor(kAzure-8);
+	// PlotRBE10SFChenAndAhmad(c, legend, "Chen and Ahmad", markerAtts, lineStyle, "L", H1437FittingParams,cesiumAlphaBeta);
+	// lineStyle.SetLineColor(kGreen-8);
+	// PlotRBE10SFWedenberg(c, legend, "Wedenberg", markerAtts, lineStyle, "L", H1437FittingParams,cesiumAlphaBeta);
 
 	
 
-	//Create cubic BWF
-	BiologicalWeightingFunction CubicBWF;
-	BWF_Fitting_Results CubicCubicFyBestResults;
-	CubicBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[3]*linealEnergy*linealEnergy*linealEnergy)+(params[2]*linealEnergy*linealEnergy)+(params[1]*linealEnergy)+params[0]);}, 4);
-	CubicBWF.SetValues(std::vector<double> {0.00013752, -0.00399419, 0.0252074, 0.0564586});
-	CubicCubicFyBestResults.alphaFunc = CubicBWF;
-	CubicBWF.SetValues(std::vector<double> {9.41183e-06, -0.000406718, 0.00310442, 0.0296854});
-	CubicCubicFyBestResults.betaFunc = CubicBWF;
+	// //Create cubic BWF
+	// BiologicalWeightingFunction CubicBWF;
+	// BWF_Fitting_Results CubicCubicFyBestResults;
+	// CubicBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[3]*linealEnergy*linealEnergy*linealEnergy)+(params[2]*linealEnergy*linealEnergy)+(params[1]*linealEnergy)+params[0]);}, 4);
+	// CubicBWF.SetValues(std::vector<double> {0.00013752, -0.00399419, 0.0252074, 0.0564586});
+	// CubicCubicFyBestResults.alphaFunc = CubicBWF;
+	// CubicBWF.SetValues(std::vector<double> {9.41183e-06, -0.000406718, 0.00310442, 0.0296854});
+	// CubicCubicFyBestResults.betaFunc = CubicBWF;
 
-	markerAtts.SetMarkerColor(kViolet+4);
-	markerAtts.SetMarkerStyle(20);
-	PlotRBE10SF(c, legend, "f(y) spectrum", markerAtts, "P", H1437FittingParams,cesiumAlphaBeta,CubicCubicFyBestResults);
+	// markerAtts.SetMarkerColor(kViolet+4);
+	// markerAtts.SetMarkerStyle(20);
+	// PlotRBE10SF(c, legend, "f(y) spectrum", markerAtts, "P", H1437FittingParams,cesiumAlphaBeta,CubicCubicFyBestResults);
 
-	//Create LE2 BWF
-	BiologicalWeightingFunction LE2BWF;
-	LE2BWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[0]*linealEnergy)*std::exp(-params[1]*linealEnergy*linealEnergy)+params[2]);}, 3);
-	LE2BWF.SetValues(std::vector<double> {0.0941433, -0.00583604, 0.00233011});
+	// //Create LE2 BWF
+	// BiologicalWeightingFunction LE2BWF;
+	// LE2BWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[0]*linealEnergy)*std::exp(-params[1]*linealEnergy*linealEnergy)+params[2]);}, 3);
+	// LE2BWF.SetValues(std::vector<double> {0.0941433, -0.00583604, 0.00233011});
 
-	//Fifth order poly BWF
-	BiologicalWeightingFunction FifthBWF;
-	FifthBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[5]*linealEnergy*linealEnergy*linealEnergy*linealEnergy*linealEnergy)+(params[4]*linealEnergy*linealEnergy*linealEnergy*linealEnergy)+(params[3]*linealEnergy*linealEnergy*linealEnergy)+(params[2]*linealEnergy*linealEnergy)+(params[1]*linealEnergy)+params[0]);}, 6);
-	FifthBWF.SetValues(std::vector<double> {1.10568e-06, -4.67063e-05, 0.000773506, -0.00602498, 0.0228525, 0.00195857});
+	// //Fifth order poly BWF
+	// BiologicalWeightingFunction FifthBWF;
+	// FifthBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return ((params[5]*linealEnergy*linealEnergy*linealEnergy*linealEnergy*linealEnergy)+(params[4]*linealEnergy*linealEnergy*linealEnergy*linealEnergy)+(params[3]*linealEnergy*linealEnergy*linealEnergy)+(params[2]*linealEnergy*linealEnergy)+(params[1]*linealEnergy)+params[0]);}, 6);
+	// FifthBWF.SetValues(std::vector<double> {1.10568e-06, -4.67063e-05, 0.000773506, -0.00602498, 0.0228525, 0.00195857});
 
-	BWF_Fitting_Results BestLETH1437;
-	BestLETH1437.alphaFunc = LE2BWF;
-	BestLETH1437.betaFunc = FifthBWF;
+	// BWF_Fitting_Results BestLETH1437;
+	// BestLETH1437.alphaFunc = LE2BWF;
+	// BestLETH1437.betaFunc = FifthBWF;
 
-	markerAtts.SetMarkerColor(kTeal+3);
-	markerAtts.SetMarkerStyle(34);
-	PlotRBE10SFLET(c, legend, "LET_{d}", markerAtts, "P", H1437FittingParams,cesiumAlphaBeta,BestLETH1437);
+	// markerAtts.SetMarkerColor(kTeal+3);
+	// markerAtts.SetMarkerStyle(34);
+	// PlotRBE10SFLET(c, legend, "LET_{d}", markerAtts, "P", H1437FittingParams,cesiumAlphaBeta,BestLETH1437);
 
-	markerAtts.SetMarkerColor(kBlack);markerAtts.SetMarkerStyle(23);
-	PlotRBE10SF(c, legend, "Guan 2015", markerAtts, lineStyle, "P", H1437FittingParams,cesiumAlphaBeta,results.alphabetaParams);
+	// markerAtts.SetMarkerColor(kBlack);markerAtts.SetMarkerStyle(23);
+	// PlotRBE10SF(c, legend, "Guan 2015", markerAtts, lineStyle, "P", H1437FittingParams,cesiumAlphaBeta,results.alphabetaParams);
 
 
 	// Ceres_BWF_Fitter BWFFitter{};
@@ -6105,8 +6141,8 @@ void Survival_Fitting()
 	// lineStyle.SetLineColor(kGreen-7);
 	// PlotRBE10SFWedenberg(c, legend, "Wedenberg", markerAtts, lineStyle, "L", H1437FittingParams,cesiumAlphaBeta);
 
-	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/RBE_10_SF_H1437.jpg";
-	c->SaveAs((TString)outputName); 
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/RBE_10_SF_H1437.jpg";
+	// c->SaveAs((TString)outputName); 
 
 	// PlotAlphaBeta(c, legend, "", markerAtts, "AP", H460FittingParams, AlphaBeta, false);
 	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/alpha_H460.jpg";

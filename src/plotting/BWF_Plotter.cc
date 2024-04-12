@@ -51,6 +51,8 @@ void GeneralizedBWFMultigraphPlotter(TCanvas* c, TLegend* legend, const TAttLine
 	}
 }
 
+
+
 void AlphaBetaMultigraphResiduals(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BWF_Fitting_Results results,  double minDose, double maxDose)
 {
 	const std::vector<std::pair<std::string,TH1D>> DySpectra = survivalParams.dySpectra;
@@ -413,8 +415,8 @@ void MultigraphSurvivalFitPlotter(TCanvas* c, TLegend* legend, const TAttLine& l
 			//No marker
 			gr->SetMarkerSize(0);
 
-			// if (!legendAdded) { legend->AddEntry(gr, (TString)legendName, "L"); legendAdded = true; }
-			// legend->Draw();
+			if (!legendAdded) { legend->AddEntry(gr, (TString)legendName, "L"); legendAdded = true; }
+			legend->Draw();
 
 			++i;
 	}
@@ -681,6 +683,111 @@ void GeneralizedBWFMultigraphPlotterAlphaBeta(TCanvas* c, TLegend* legend, const
 
 			++i;
 	}
+}
+
+void GeneralizedBWFMultigraphPlotterLETAlphaBeta(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BWF_Fitting_Results results, double minDose, double maxDose)
+{
+	const std::vector<double>* const LETds = &survivalParams.LETd;
+	const std::vector<std::vector<double>> doselist = survivalParams.dose;
+	// const int nAlphaparams = alphaFittingFunction.GetNumFittingParams();
+	// const int nParams = (alphaFittingFunction.GetNumFittingParams()+betaFittingFunction.GetNumFittingParams());
+	//const double beta = fitFuncParams[nParams];
+
+	bool legendAdded = false; 
+	if (legendName == "") { legendAdded = true; }
+	int i = 0;
+
+	for(double LETd:*LETds) //First we iterate over each LET
+	{
+		c->cd(i+1);
+
+		TGraph* gr = new TGraph();
+
+		double alphaPredicted = results.alphaFunc.GetValue(LETd);
+		double betaPredicted = results.betaFunc.GetValue( LETd);
+
+		for (double j = minDose; j < maxDose; j+=0.01) //Iterate through every dose at a given lineal energy
+		{
+			double survivalPredicted = 0; 
+
+			//calculate the exponent of survival predicted
+			survivalPredicted = (alphaPredicted*(j))+((betaPredicted)*(j*j));
+			//take e^exponent
+			survivalPredicted = std::exp(-survivalPredicted);
+			//Add point to the graph
+			gr->AddPoint(j,survivalPredicted);
+		}
+			//Draw
+			gr->Draw("L");
+
+			//Set line settings
+			gr->SetLineColor(lineAttributes.GetLineColor());
+			gr->SetLineWidth(lineAttributes.GetLineWidth());
+			gr->SetLineStyle(lineAttributes.GetLineStyle());
+
+			//No marker
+			gr->SetMarkerSize(0);
+
+			if (!legendAdded) { legend->AddEntry(gr, (TString)legendName, "L"); legendAdded = true; }
+			legend->Draw();
+
+			++i;
+	}
+
+	//Now let's iterate through our lineal energy library, plot, and do all that nice stuff
+	// for(const std::pair<std::string,TH1D>& spectrumPair:DySpectra) //First we iterate over each of the lineal energy spectra
+	// {
+	// 	c->cd(i+1);
+
+	// 	TGraph* gr = new TGraph();
+
+	// 	const TH1D& dySpectrum = std::get<1>(spectrumPair); //Pulling a reference so we don't remake this object
+	// 	double alphaPredicted = 0;
+	// 	double betaPredicted = 0;
+
+	// 	for(int k = 1; k <= dySpectrum.GetNbinsX(); ++k) //Iterate over every histogram bin to calculate alpha
+	// 	{
+	// 		//Get the spectrum value
+	// 		double width = dySpectrum.GetBinWidth(k);
+	// 		double center = dySpectrum.GetBinCenter(k);
+	// 		double value = dySpectrum.GetBinContent(k);
+
+	// 		//Accumulate the predicted value of alpha as we integrate the function
+	// 		double ryAlphaVal = results.alphaFunc.GetValue(center);
+	// 		alphaPredicted += ryAlphaVal*value*width; //value*width is d(y)*dy, and everything else is r(y)
+
+	// 		double ryBetaVal = results.betaFunc.GetValue(center);
+	// 		betaPredicted += ryBetaVal*value*width; //value*width is d(y)*dy, and everything else is r(y)
+
+	// 	}
+
+	// 	for (double j = minDose; j < maxDose; j+=0.01) //Iterate through every dose at a given lineal energy
+	// 	{
+	// 		double survivalPredicted = 0; 
+
+	// 		//calculate the exponent of survival predicted
+	// 		survivalPredicted = (alphaPredicted*(j))+((betaPredicted)*(j*j));
+	// 		//take e^exponent
+	// 		survivalPredicted = std::exp(-survivalPredicted);
+	// 		//Add point to the graph
+	// 		gr->AddPoint(j,survivalPredicted);
+	// 	}
+	// 		//Draw
+	// 		gr->Draw("L");
+
+	// 		//Set line settings
+	// 		gr->SetLineColor(lineAttributes.GetLineColor());
+	// 		gr->SetLineWidth(lineAttributes.GetLineWidth());
+	// 		gr->SetLineStyle(lineAttributes.GetLineStyle());
+
+	// 		//No marker
+	// 		gr->SetMarkerSize(0);
+
+	// 		if (!legendAdded) { legend->AddEntry(gr, (TString)legendName, "L"); legendAdded = true; }
+	// 		legend->Draw();
+
+	// 		++i;
+	// }
 }
 
 void AlphaBetaMultigraphResiduals(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BiologicalWeightingFunction alphaFittingFunction, BiologicalWeightingFunction betaFittingFunction, double* fitFuncParams,  double minDose, double maxDose)

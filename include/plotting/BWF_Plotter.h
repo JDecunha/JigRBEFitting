@@ -28,6 +28,8 @@ TGraph* BWFFunctionPlotter(TCanvas* c, TLegend* legend, const TAttLine& lineAttr
 void GeneralizedBWFMultigraphPlotter(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BWF_Fitting_Results results, double* fitFuncParams,  double minDose = 0, double maxDose = 5.75);
 void AlphaBetaMultigraphResiduals(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BWF_Fitting_Results results,  double minDose = 0, double maxDose = 5.75);
 void AlphaBetaMultigraphResidualsLET(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BWF_Fitting_Results results,  double minDose = 0, double maxDose = 5.75);
+
+
 //
 // Depreceated
 //
@@ -35,6 +37,7 @@ void GeneralizedBWFMultigraphPlotter(TCanvas* c, TLegend* legend, const TAttLine
 void GeneralizedBWFMultigraphPlotterBeta(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudySurvivalParameters& survivalParams, BiologicalWeightingFunction fittingFunction, double* fitFuncParams,  double minDose = 0, double maxDose = 5.75);
 void GeneralizedBWFMultigraphPlotterAlphaBeta(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BiologicalWeightingFunction alphaFittingFunction, BiologicalWeightingFunction betaFittingFunction, double* fitFuncParams,  double minDose = 0, double maxDose = 5.75);
 void GeneralizedBWFMultigraphPlotterAlphaBeta(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BWF_Fitting_Results results,  double minDose = 0, double maxDose = 5.75);
+void GeneralizedBWFMultigraphPlotterLETAlphaBeta(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BWF_Fitting_Results results, double minDose = 0, double maxDose = 5.75);
 
 void GeneralizedLETMultigraphPlotterAlphaBeta(TCanvas* c, TLegend* legend, const TAttLine& lineAttributes, std::string legendName, const CellStudyBWFFittingParameters& survivalParams, BiologicalWeightingFunction alphaFittingFunction, BiologicalWeightingFunction betaFittingFunction, double* fitFuncParams,  double minDose = 0, double maxDose = 5.75);
 

@@ -107,7 +107,7 @@ void SetupH460SurvivalParameters()
 	//Get the lineal energy spectra library
 	gInterpreter->GenerateDictionary("pair<string,TH1F>;vector<pair<string,TH1F> >", "TH1.h;string;utility;vector");
 	std::vector<std::pair<std::string, TH1D>>* dySpectraLibrary;
-	TFile* dySpectrumFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealFYSpectraApril2023CellStudy_1e3nm.root");
+	TFile* dySpectrumFile = TFile::Open("/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Data/LinealSpectraApril2023CellStudy_1e3nm.root");
 	dySpectrumFile->GetObject("Lineal_energy_library",dySpectraLibrary);
 	dySpectrumFile->Close(); //Close file
 
@@ -296,8 +296,9 @@ void Fixed_Beta()
 
 	Ceres_BWF_Fitter BWFFitter{};
 	std::cout << std::endl << "Linear" << std::endl;
+	// LinearBWF.SetValues(std::vector<double> {0.0399,0.0457});
 	BWFFitter.SetAlphaWeightingFunction(LinearBWF);
-	// FixedBWF.SetValues(std::vector<double> {0.13}); //Give beta value before passing into the fitter
+	// FixedBWF.SetValues(std::vector<double> {0.1355}); //Give beta value before passing into the fitter
 	// FifthBWF.SetValues(std::vector<double> {-3.62923e-21, -1.02135e-05, 0.00129381, -0.0357744, 0.220213, -0.107979});
 	BWFFitter.SetBetaWeightingFunction(FixedBWF);
 	BWFFitter.SetCellStudyParameters(H460FittingParams);
@@ -4765,7 +4766,7 @@ void Survival_Fitting()
 	c->SetBottomMargin(0.13);
 	// c->Divide(4,3,0.000000005,0.001);
 	// auto legend = new TLegend(0.52,0.72,0.95,0.72+0.23);//x start, y start, x end, yend
-	auto legend = new TLegend(0.14,0.64,0.14+0.23,0.72+0.23);
+	auto legend = new TLegend(0.14,0.64,0.14+0.31,0.72+0.23);
 	legend->SetTextSize(0.04);
 
 	TAttMarker markerAtts;
@@ -4773,13 +4774,23 @@ void Survival_Fitting()
 	markerAtts.SetMarkerSize(10);
 	
 	TAttLine lineStyle{};
+	lineStyle.SetLineWidth(5);
+	lineStyle.SetLineStyle(1);
 
 	Ceres_Survival_Fitter CeresSurvival{};
 	CeresSurvival.SetCellStudyParameters(H460FittingParams);
 	CeresSurvival.Initialize();
-	auto results = CeresSurvival.Fit();
+	// auto results = CeresSurvival.Fit();
 
-	results.PrintSummary();
+	// SurvivalDataMultigraph(c, legend, H460FittingParams);
+	// lineStyle.SetLineColor(kRed+2);
+	// lineStyle.SetLineWidth(5);
+	// lineStyle.SetLineStyle(1);
+	// MultigraphSurvivalFitPlotter(c, legend, lineStyle, "DirectFit", H460FittingParams, AlphaBeta);
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/DirectFitH460.jpg";
+	// c->SaveAs((TString)outputName); 
+
+	// results.PrintSummary();
 	
 
 	// PlotAlphaBeta(c, legend, "", markerAtts, "AP", H460FittingParams, AlphaBeta, false);
@@ -4796,34 +4807,54 @@ void Survival_Fitting()
 
 
 	Ceres_BWF_Fitter BWFFitter{};
-	std::cout << std::endl << "Cubic" << std::endl;
-	BWFFitter.SetAlphaWeightingFunction(CubicBWF);
-	// FixedBWF.SetValues(std::vector<double> {0.13}); //Give beta value before passing into the fitter
-	// FifthBWF.SetValues(std::vector<double> {-3.62923e-21, -1.02135e-05, 0.00129381, -0.0357744, 0.220213, -0.107979});
-	BWFFitter.SetBetaWeightingFunction(QuadraticBWF);
-	BWFFitter.SetCellStudyParameters(H460FittingParams);
-	double penaltyWeight = 0.05; //0.01;
-	BWFFitter.SetPositiveConstrained(true, penaltyWeight);
-	BWFFitter.Initialize();
-	auto cubicsecond = BWFFitter.Fit();
-	cubicsecond.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(cubicsecond.alphaFunc);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(cubicsecond.betaFunc);
+	BiologicalWeightingFunction GaussianPlusOffsetBWF2;
+	BWF_Fitting_Results GaussianDyBestResults;
+	GaussianPlusOffsetBWF2.SetWeightingFunction( [] (double const* params, double linealEnergy) 
+	{ 
+		return (((params[0])*std::exp(-((linealEnergy-params[1])*(linealEnergy-params[1]))/(params[2]*params[2]*2)))+params[3]); 
+	}
+	, 4);
+	GaussianPlusOffsetBWF2.SetValues(std::vector<double>  {  0.230491501205610, 5.51962016177844,114.092470171093,95.2590461228117 });
+	FixedBWF.SetValues(std::vector<double> {0.101961735572583});
+	GaussianDyBestResults.alphaFunc = GaussianPlusOffsetBWF2;
+	GaussianDyBestResults.betaFunc = FixedBWF;
+
+	BWF_Fitting_Results MorstinLinearDyBestResults;
+	MorstinBWF.SetValues(std::vector<double> {1.33638439092475e-06, -2.98606802538980e-05, 0.000137006580329845, 3010.90150042332});
+	FixedBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return params[0];}, 1);
+	FixedBWF.SetValues(std::vector<double> {0.111377434741229});
+	MorstinLinearDyBestResults.alphaFunc = MorstinBWF;
+	MorstinLinearDyBestResults.betaFunc = FixedBWF;
+
+	BWF_Fitting_Results MorstinLinearDyBestWeightedResults;
+	MorstinBWF.SetValues(std::vector<double> {7.87804976156578e-07, -2.13716006297374e-05, 0.000114200443445769, 5424.35985122075});
+	FixedBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return params[0];}, 1);
+	FixedBWF.SetValues(std::vector<double> {0.0893680456034658});
+	MorstinLinearDyBestWeightedResults.alphaFunc = MorstinBWF;
+	MorstinLinearDyBestWeightedResults.betaFunc = FixedBWF;
+
+	BWF_Fitting_Results CubicLinearDyBestRegularResults;
+	// CubicBWF.SetValues(std::vector<double> {0.00838701932847768,0.185289234216632,-0.0250980413297348,0.000372587152280048});
+	CubicBWF.SetValues(std::vector<double> {0.000337133584729527, -0.0222918654682546, 0.157099764860757, 0.0431408242731182});
+	//FixedBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return params[0];}, 1);
+	FixedBWF.SetValues(std::vector<double> {0.112398569166481});
+	CubicLinearDyBestRegularResults.alphaFunc = CubicBWF;
+	CubicLinearDyBestRegularResults.betaFunc = FixedBWF;
+
+	BWF_Fitting_Results CubicLinearDyBestWeightedResults;
+	// CubicBWF.SetValues(std::vector<double> {0.00838701932847768,0.185289234216632,-0.0250980413297348,0.000372587152280048});
+	CubicBWF.SetValues(std::vector<double> {0.000372587152280048, -0.0250980413297348, 0.185289234216632, 0.00838701932847768});
+	//FixedBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return params[0];}, 1);
+	FixedBWF.SetValues(std::vector<double> {0.115994363406138});
+	CubicLinearDyBestWeightedResults.alphaFunc = CubicBWF;
+	CubicLinearDyBestWeightedResults.betaFunc = FixedBWF;
 
 	Ceres_LET_Fitter BWFFitter2;
-	std::cout << std::endl << "LQE2" << std::endl;
-	// LQE2BWF.SetValues(std::vector<double> {0.228648, -0.000117843, 0.000980533, -0.0299326});
-	BWFFitter2.SetAlphaWeightingFunction(LQE2BWF);
-	// FourthBWF.SetValues(std::vector<double> {0,1.37078e-05, -0.00054164, -0.000957938, 0.150888});
-	BWFFitter2.SetBetaWeightingFunction(FourthBWF);
-	BWFFitter2.SetCellStudyParameters(H460FittingParams);
-	// double penaltyWeight = 0.01; //0.01;
-	BWFFitter2.SetPositiveConstrained(true, penaltyWeight);
-	BWFFitter2.Initialize();
-	auto LQE2Results = BWFFitter2.Fit();
-	LQE2Results.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
-	Ceres_LET_Fitter::CheckFunctionNegativity(LQE2Results.alphaFunc);
-	Ceres_LET_Fitter::CheckFunctionNegativity(LQE2Results.betaFunc);
+	QEBWF.SetValues(std::vector<double>  {  0.209024, -0.105069, 0.000636537 });
+	FixedBWF.SetValues(std::vector<double> {0.114731});
+	BWF_Fitting_Results BestLETH460;
+	BestLETH460.alphaFunc = QEBWF;
+	BestLETH460.betaFunc = FixedBWF;
 
 	// markerAtts.SetMarkerColor(kGreen+2);
 	lineStyle.SetLineWidth(14);
@@ -4836,21 +4867,24 @@ void Survival_Fitting()
 	lineStyle.SetLineColor(kGreen-8);
 	PlotRBE10SFWedenberg(c, legend, "Wedenberg", markerAtts, lineStyle, "L", H460FittingParams,cesiumAlphaBeta);
 
-	markerAtts.SetMarkerColor(kViolet+4);
-	markerAtts.SetMarkerStyle(20);
-	PlotRBE10SF(c, legend, "d(y) spectrum", markerAtts, "P", H460FittingParams,cesiumAlphaBeta,cubicsecond);
+	markerAtts.SetMarkerColor(kAzure+2);
+	markerAtts.SetMarkerStyle(323);
+	markerAtts.SetMarkerSize(12);
+	PlotRBE10SF(c, legend, "d(y) - Morstin, weighted", markerAtts, "P", H460FittingParams,cesiumAlphaBeta,MorstinLinearDyBestWeightedResults);
 
-	markerAtts.SetMarkerColor(kTeal+3);
+	markerAtts.SetMarkerColor(kTeal+4);
 	markerAtts.SetMarkerStyle(34);
-	PlotRBE10SFLET(c, legend, "LET_{d}", markerAtts, "P", H460FittingParams,cesiumAlphaBeta,LQE2Results);
+	markerAtts.SetMarkerSize(10);
+	PlotRBE10SFLET(c, legend, "LET_{d}", markerAtts, "P", H460FittingParams,cesiumAlphaBeta,BestLETH460);
+	// PlotRBE10SF(c, legend, "d(y) - Morstin", markerAtts, "P", H460FittingParams,cesiumAlphaBeta,MorstinLinearDyBestResults);
 	markerAtts.SetMarkerColor(kBlack);markerAtts.SetMarkerStyle(23);
 	PlotRBE10SF(c, legend, "Guan 2015", markerAtts, lineStyle, "P", H460FittingParams,cesiumAlphaBeta,AlphaBeta);
 	
 
 	
 
-	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/RBE_10_SF_H460.jpg";
-	c->SaveAs((TString)outputName); 
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/RBE_10_SF_H460_MorstinWeightedVsNon.jpg";
+	// c->SaveAs((TString)outputName); 
 
 	// void PlotRBE10SF(TCanvas* c, TLegend* legend, std::string const& legendName, TAttMarker const& markerAttributes, std::string options, CellStudyBWFFittingParameters survivalParams, double const* alphaBetasCesium, double const* alphaBetasProton)''
 }
@@ -5094,94 +5128,94 @@ void Best_Model_Plotting()
 		// The Polynomials
 		//
 
-	Ceres_BWF_Fitter BWFFitter{};
-	std::cout << std::endl << "Linear" << std::endl;
-	BWFFitter.SetAlphaWeightingFunction(LinearBWF);
-	// FixedBWF.SetValues(std::vector<double> {0.13}); //Give beta value before passing into the fitter
-	// FifthBWF.SetValues(std::vector<double> {-3.62923e-21, -1.02135e-05, 0.00129381, -0.0357744, 0.220213, -0.107979});
-	BWFFitter.SetBetaWeightingFunction(FixedBWF);
-	BWFFitter.SetCellStudyParameters(H460FittingParams);
-	double penaltyWeight = 0.001; //0.01;
-	BWFFitter.SetPositiveConstrained(true, penaltyWeight);
-	BWFFitter.Initialize();
-	auto linearResults = BWFFitter.Fit();
-	linearResults.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(linearResults.alphaFunc);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(linearResults.betaFunc);
+	// Ceres_BWF_Fitter BWFFitter{};
+	// std::cout << std::endl << "Linear" << std::endl;
+	// BWFFitter.SetAlphaWeightingFunction(LinearBWF);
+	// // FixedBWF.SetValues(std::vector<double> {0.13}); //Give beta value before passing into the fitter
+	// // FifthBWF.SetValues(std::vector<double> {-3.62923e-21, -1.02135e-05, 0.00129381, -0.0357744, 0.220213, -0.107979});
+	// BWFFitter.SetBetaWeightingFunction(FixedBWF);
+	// BWFFitter.SetCellStudyParameters(H460FittingParams);
+	// double penaltyWeight = 0.001; //0.01;
+	// BWFFitter.SetPositiveConstrained(true, penaltyWeight);
+	// BWFFitter.Initialize();
+	// auto linearResults = BWFFitter.Fit();
+	// linearResults.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(linearResults.alphaFunc);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(linearResults.betaFunc);
 
-	std::cout << std::endl << "Quadratic" << std::endl;
-	std::vector<double> quadraticGuesses;
-	//Take the results from the last fit and use them to inform this fit
-	quadraticGuesses.push_back(0);
-	quadraticGuesses.push_back(linearResults.alphaFunc.GetFittingParams()[1]);
-	quadraticGuesses.push_back(linearResults.alphaFunc.GetFittingParams()[0]);
-	QuadraticBWF.SetValues(quadraticGuesses);
-	BWFFitter.SetAlphaWeightingFunction(QuadraticBWF);
-	BWFFitter.Initialize();
-	auto quadraticResults = BWFFitter.Fit();
-	quadraticResults.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(quadraticResults.alphaFunc);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(quadraticResults.betaFunc);
+	// std::cout << std::endl << "Quadratic" << std::endl;
+	// std::vector<double> quadraticGuesses;
+	// //Take the results from the last fit and use them to inform this fit
+	// quadraticGuesses.push_back(0);
+	// quadraticGuesses.push_back(linearResults.alphaFunc.GetFittingParams()[1]);
+	// quadraticGuesses.push_back(linearResults.alphaFunc.GetFittingParams()[0]);
+	// QuadraticBWF.SetValues(quadraticGuesses);
+	// BWFFitter.SetAlphaWeightingFunction(QuadraticBWF);
+	// BWFFitter.Initialize();
+	// auto quadraticResults = BWFFitter.Fit();
+	// quadraticResults.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(quadraticResults.alphaFunc);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(quadraticResults.betaFunc);
 
-	std::cout << std::endl << "Cubic" << std::endl;
-	std::vector<double> cubicGuesses;
-	cubicGuesses.push_back(0);
-	cubicGuesses.push_back(quadraticResults.alphaFunc.GetFittingParams()[2]);
-	cubicGuesses.push_back(quadraticResults.alphaFunc.GetFittingParams()[1]);
-	cubicGuesses.push_back(quadraticResults.alphaFunc.GetFittingParams()[0]);
-	CubicBWF.SetValues(cubicGuesses);
-	BWFFitter.SetAlphaWeightingFunction(CubicBWF);
-	BWFFitter.Initialize();
-	auto cubicResults = BWFFitter.Fit();
-	cubicResults.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(cubicResults.alphaFunc);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(cubicResults.betaFunc);
+	// std::cout << std::endl << "Cubic" << std::endl;
+	// std::vector<double> cubicGuesses;
+	// cubicGuesses.push_back(0);
+	// cubicGuesses.push_back(quadraticResults.alphaFunc.GetFittingParams()[2]);
+	// cubicGuesses.push_back(quadraticResults.alphaFunc.GetFittingParams()[1]);
+	// cubicGuesses.push_back(quadraticResults.alphaFunc.GetFittingParams()[0]);
+	// CubicBWF.SetValues(cubicGuesses);
+	// BWFFitter.SetAlphaWeightingFunction(CubicBWF);
+	// BWFFitter.Initialize();
+	// auto cubicResults = BWFFitter.Fit();
+	// cubicResults.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(cubicResults.alphaFunc);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(cubicResults.betaFunc);
 
-	std::cout << std::endl << "Fourth order polynomial" << std::endl;
-	std::vector<double> fourthGuesses;
-	fourthGuesses.push_back(0);
-	fourthGuesses.push_back(cubicResults.alphaFunc.GetFittingParams()[3]);
-	fourthGuesses.push_back(cubicResults.alphaFunc.GetFittingParams()[2]);
-	fourthGuesses.push_back(cubicResults.alphaFunc.GetFittingParams()[1]);
-	fourthGuesses.push_back(cubicResults.alphaFunc.GetFittingParams()[0]);
-	FourthBWF.SetValues(fourthGuesses);
-	BWFFitter.SetAlphaWeightingFunction(FourthBWF);
-	BWFFitter.Initialize();
-	auto fourthResults = BWFFitter.Fit();
-	fourthResults.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(fourthResults.alphaFunc);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(fourthResults.betaFunc);
+	// std::cout << std::endl << "Fourth order polynomial" << std::endl;
+	// std::vector<double> fourthGuesses;
+	// fourthGuesses.push_back(0);
+	// fourthGuesses.push_back(cubicResults.alphaFunc.GetFittingParams()[3]);
+	// fourthGuesses.push_back(cubicResults.alphaFunc.GetFittingParams()[2]);
+	// fourthGuesses.push_back(cubicResults.alphaFunc.GetFittingParams()[1]);
+	// fourthGuesses.push_back(cubicResults.alphaFunc.GetFittingParams()[0]);
+	// FourthBWF.SetValues(fourthGuesses);
+	// BWFFitter.SetAlphaWeightingFunction(FourthBWF);
+	// BWFFitter.Initialize();
+	// auto fourthResults = BWFFitter.Fit();
+	// fourthResults.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(fourthResults.alphaFunc);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(fourthResults.betaFunc);
 
-		//
-		// Mairani et al.
-		//
+	// 	//
+	// 	// Mairani et al.
+	// 	//
 
-	std::cout << std::endl << "LQE" << std::endl;
-	std::vector<double> LQEGuesses;
-	LQEGuesses.push_back(0);
-	LQEGuesses.push_back(0.1);
-	LQEGuesses.push_back(quadraticResults.alphaFunc.GetFittingParams()[2]);
-	LQEGuesses.push_back(linearResults.alphaFunc.GetFittingParams()[1]);
-	LQEBWF.SetValues(LQEGuesses);
-	BWFFitter.SetAlphaWeightingFunction(LQEBWF);
-	FixedBWF.SetValues(std::vector<double> {0});
-	BWFFitter.SetBetaWeightingFunction(FixedBWF);
-	BWFFitter.Initialize(); 
-	auto LQEResults = BWFFitter.Fit();
-	LQEResults.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(LQEResults.alphaFunc);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(LQEResults.betaFunc);
+	// std::cout << std::endl << "LQE" << std::endl;
+	// std::vector<double> LQEGuesses;
+	// LQEGuesses.push_back(0);
+	// LQEGuesses.push_back(0.1);
+	// LQEGuesses.push_back(quadraticResults.alphaFunc.GetFittingParams()[2]);
+	// LQEGuesses.push_back(linearResults.alphaFunc.GetFittingParams()[1]);
+	// LQEBWF.SetValues(LQEGuesses);
+	// BWFFitter.SetAlphaWeightingFunction(LQEBWF);
+	// FixedBWF.SetValues(std::vector<double> {0});
+	// BWFFitter.SetBetaWeightingFunction(FixedBWF);
+	// BWFFitter.Initialize(); 
+	// auto LQEResults = BWFFitter.Fit();
+	// LQEResults.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(LQEResults.alphaFunc);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(LQEResults.betaFunc);
 
-	std::cout << std::endl << "LQE2" << std::endl;
-	LQE2BWF.SetValues(LQEGuesses);
-	BWFFitter.SetAlphaWeightingFunction(LQE2BWF);
-	FixedBWF.SetValues(std::vector<double> {0});
-	BWFFitter.SetBetaWeightingFunction(FixedBWF);
-	BWFFitter.Initialize();
-	auto LQE2Results = BWFFitter.Fit();
-	LQE2Results.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(LQE2Results.alphaFunc);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(LQE2Results.betaFunc);
+	// std::cout << std::endl << "LQE2" << std::endl;
+	// LQE2BWF.SetValues(LQEGuesses);
+	// BWFFitter.SetAlphaWeightingFunction(LQE2BWF);
+	// FixedBWF.SetValues(std::vector<double> {0});
+	// BWFFitter.SetBetaWeightingFunction(FixedBWF);
+	// BWFFitter.Initialize();
+	// auto LQE2Results = BWFFitter.Fit();
+	// LQE2Results.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(LQE2Results.alphaFunc);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(LQE2Results.betaFunc);
 
 	//
 	// Other
@@ -5189,41 +5223,50 @@ void Best_Model_Plotting()
 
 
 	std::cout << std::endl << "Morstin" << std::endl;
-	MorstinBWF.SetValues(std::vector<double> {1.73008e-07, -5.53241e-06, 2.53421e-05, 13541.4}); //{2.*std::pow(10,-7), 2.1*std::pow(10,-5), 2.5*std::pow(10,-6), 11460.000000 });
-	BWFFitter.SetAlphaWeightingFunction(MorstinBWF);
+	// MorstinBWF.SetValues(std::vector<double> {1.73008e-07, -5.53241e-06, 2.53421e-05, 13541.4}); //{2.*std::pow(10,-7), 2.1*std::pow(10,-5), 2.5*std::pow(10,-6), 11460.000000 });
+	MorstinBWF.SetValues(std::vector<double> {1.33638439092475e-06, -2.98606802538980e-05, 0.000137006580329845, 3010.90150042332}); 
+	// BWFFitter.SetAlphaWeightingFunction(MorstinBWF);
 	CubicBWF.SetValues(std::vector<double> {0,0,0,0});
-	BWFFitter.SetBetaWeightingFunction(CubicBWF);
-	BWFFitter.Initialize();
-	auto MorstinResults = BWFFitter.Fit();
-	MorstinResults.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(MorstinResults.alphaFunc);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(MorstinResults.betaFunc);
+	// BWFFitter.SetBetaWeightingFunction(CubicBWF);
+	// BWFFitter.Initialize();
+	// auto MorstinResults = BWFFitter.Fit();
+	// MorstinResults.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(MorstinResults.alphaFunc);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(MorstinResults.betaFunc);
 
 	//1st order beta fitting
 
-	BWFFitter.SetAlphaWeightingFunction(LinearBWF);
-	// FixedBWF.SetValues(std::vector<double> {0.13}); //Give beta value before passing into the fitter
-	// FifthBWF.SetValues(std::vector<double> {-3.62923e-21, -1.02135e-05, 0.00129381, -0.0357744, 0.220213, -0.107979});
-	BWFFitter.SetBetaWeightingFunction(LinearBWF);
-	BWFFitter.Initialize();
-	auto linearResultsfirst = BWFFitter.Fit();
-	linearResultsfirst.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(linearResultsfirst.alphaFunc);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(linearResultsfirst.betaFunc);
+	// BWFFitter.SetAlphaWeightingFunction(LinearBWF);
+	// // FixedBWF.SetValues(std::vector<double> {0.13}); //Give beta value before passing into the fitter
+	// // FifthBWF.SetValues(std::vector<double> {-3.62923e-21, -1.02135e-05, 0.00129381, -0.0357744, 0.220213, -0.107979});
+	// BWFFitter.SetBetaWeightingFunction(LinearBWF);
+	// BWFFitter.Initialize();
+	// auto linearResultsfirst = BWFFitter.Fit();
+	// linearResultsfirst.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(linearResultsfirst.alphaFunc);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(linearResultsfirst.betaFunc);
 
-	std::cout << std::endl << "Quadratic" << std::endl;
-	std::vector<double> quadraticGuessesfirst;
-	//Take the results from the last fit and use them to inform this fit
-	quadraticGuessesfirst.push_back(0);
-	quadraticGuessesfirst.push_back(linearResultsfirst.alphaFunc.GetFittingParams()[1]);
-	quadraticGuessesfirst.push_back(linearResultsfirst.alphaFunc.GetFittingParams()[0]);
-	QuadraticBWF.SetValues(quadraticGuessesfirst);
-	BWFFitter.SetAlphaWeightingFunction(QuadraticBWF);
-	BWFFitter.Initialize();
-	auto quadraticResultsfirst = BWFFitter.Fit();
-	quadraticResultsfirst.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(quadraticResultsfirst.alphaFunc);
-	Ceres_BWF_Fitter::CheckFunctionNegativity(quadraticResultsfirst.betaFunc);
+	// std::cout << std::endl << "Quadratic" << std::endl;
+	// std::vector<double> quadraticGuessesfirst;
+	// //Take the results from the last fit and use them to inform this fit
+	// quadraticGuessesfirst.push_back(0);
+	// quadraticGuessesfirst.push_back(linearResultsfirst.alphaFunc.GetFittingParams()[1]);
+	// quadraticGuessesfirst.push_back(linearResultsfirst.alphaFunc.GetFittingParams()[0]);
+	// QuadraticBWF.SetValues(quadraticGuessesfirst);
+	// BWFFitter.SetAlphaWeightingFunction(QuadraticBWF);
+	// BWFFitter.Initialize();
+	// auto quadraticResultsfirst = BWFFitter.Fit();
+	// quadraticResultsfirst.PrintRMSEMinusPenaltyFunction(penaltyWeight, 83);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(quadraticResultsfirst.alphaFunc);
+	// Ceres_BWF_Fitter::CheckFunctionNegativity(quadraticResultsfirst.betaFunc);
+
+	BiologicalWeightingFunction GaussianPlusOffsetBWF2;
+	GaussianPlusOffsetBWF2.SetWeightingFunction( [] (double const* params, double linealEnergy) 
+	{ 
+		return (((params[0])*std::exp(-((linealEnergy-params[1])*(linealEnergy-params[1]))/(params[2]*params[2]*2)))+params[3]); 
+	}
+	, 4);
+	GaussianPlusOffsetBWF2.SetValues(std::vector<double> {  0.230491501205610, 5.51962016177844,114.092470171093,95.2590461228117 });
 
 	//
 	// Plotting
@@ -5244,9 +5287,9 @@ void Best_Model_Plotting()
 	// auto legend = new TLegend(0.14,0.66,0.14+0.33,0.72+0.22);
 	legend->SetTextSize(0.06);
 
-	// TAttLine lineStyle{};
-	// lineStyle.SetLineWidth(5);
-	// lineStyle.SetLineStyle(1);
+	TAttLine lineStyle{};
+	lineStyle.SetLineWidth(5);
+	lineStyle.SetLineStyle(1);
 	// lineStyle.SetLineColor(kGreen+2);
 	// BWFFunctionPlotter(c, legend, lineStyle, "Quadratic", QuadraticBWF, quadraticResultsfirst.alphaFunc.GetFittingParams(), "AL", 0.001, 100.);
 	// lineStyle.SetLineColor(kPink+2);
@@ -5258,9 +5301,9 @@ void Best_Model_Plotting()
 	// lineStyle.SetLineColor(kOrange+2);
 	// BWFFunctionPlotter(c, legend, lineStyle, "LQE^{2}", LQE2BWF, LQE2Results.alphaFunc.GetFittingParams(), "L", 0.001, 100.);
 	// lineStyle.SetLineColor(kYellow+2);
-	// BWFFunctionPlotter(c, legend, lineStyle, "Morstin", MorstinBWF, MorstinResults.alphaFunc.GetFittingParams(), "L", 0.001, 100.);
+	// BWFFunctionPlotter(c, legend, lineStyle, "", GaussianPlusOffsetBWF2, GaussianPlusOffsetBWF2.GetFittingParams(), "AL", 0.001, 250.);
 
-	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/H460_Candidate_AlphaBWFs.jpg";
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/Gaussian_test.jpg";
 	// c->SaveAs((TString)outputName); 
 
 	// TAttLine lineStyle{};
@@ -5327,17 +5370,84 @@ void Best_Model_Plotting()
 	//
 	//Survival data directly
 	//
+
+	BWF_Fitting_Results MorstinLinearDyBestWeightedResults;
+	MorstinBWF.SetValues(std::vector<double> {7.87804976156578e-07, -2.13716006297374e-05, 0.000114200443445769, 5424.35985122075});
+	FixedBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return params[0];}, 1);
+	FixedBWF.SetValues(std::vector<double> {0.0893680456034658});
+	MorstinLinearDyBestWeightedResults.alphaFunc = MorstinBWF;
+	MorstinLinearDyBestWeightedResults.betaFunc = FixedBWF;
+
+	BWF_Fitting_Results MorstinLinearDyBestResults;
+	MorstinBWF.SetValues(std::vector<double> {1.33638439092475e-06, -2.98606802538980e-05, 0.000137006580329845, 3010.90150042332});
+	FixedBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return params[0];}, 1);
+	FixedBWF.SetValues(std::vector<double> {0.111377434741229});
+	MorstinLinearDyBestResults.alphaFunc = MorstinBWF;
+	MorstinLinearDyBestResults.betaFunc = FixedBWF;
+
+	BWF_Fitting_Results CubicLinearDyBestRegularResults;
+	// CubicBWF.SetValues(std::vector<double> {0.00838701932847768,0.185289234216632,-0.0250980413297348,0.000372587152280048});
+	CubicBWF.SetValues(std::vector<double> {0.000337133584729527, -0.0222918654682546, 0.157099764860757, 0.0431408242731182});
+	//FixedBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return params[0];}, 1);
+	FixedBWF.SetValues(std::vector<double> {0.112398569166481});
+	CubicLinearDyBestRegularResults.alphaFunc = CubicBWF;
+	CubicLinearDyBestRegularResults.betaFunc = FixedBWF;
+
+	BWF_Fitting_Results CubicLinearDyBestWeightedResults;
+	// CubicBWF.SetValues(std::vector<double> {0.00838701932847768,0.185289234216632,-0.0250980413297348,0.000372587152280048});
+	CubicBWF.SetValues(std::vector<double> {0.000372587152280048, -0.0250980413297348, 0.185289234216632, 0.00838701932847768});
+	//FixedBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return params[0];}, 1);
+	FixedBWF.SetValues(std::vector<double> {0.115994363406138});
+	CubicLinearDyBestWeightedResults.alphaFunc = CubicBWF;
+	CubicLinearDyBestWeightedResults.betaFunc = FixedBWF;
+
+	BWF_Fitting_Results FourthLinearDyBestRegularResults;
+	// CubicBWF.SetValues(std::vector<double> {0.00838701932847768,0.185289234216632,-0.0250980413297348,0.000372587152280048});
+	FourthBWF.SetValues(std::vector<double> {1.55166949492021e-05, -0.00133016655165665, 0.0108472048475535, 1.32416754255453e-07, 0.171605600583206});
+	//FixedBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return params[0];}, 1);
+	FixedBWF.SetValues(std::vector<double> {0.114949030584930});
+	FourthLinearDyBestRegularResults.alphaFunc = FourthBWF;
+	FourthLinearDyBestRegularResults.betaFunc = FixedBWF;
+
+	BWF_Fitting_Results FourthLETBest;
+	FourthBWF.SetValues(std::vector<double> {1.14779e-05, -1.47913e-05, 0.000879819, -0.00200952, 0.212864});
+	FixedBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return params[0];}, 1);
+	FixedBWF.SetValues(std::vector<double> {0.114996});
+	FourthLETBest.alphaFunc = FourthBWF;
+	FourthLETBest.betaFunc = FixedBWF;
+
+
+	BWF_Fitting_Results CubicLETBest;
+	CubicBWF.SetValues(std::vector<double> {0.000405226, -0.00394187, 0.0168077, 0.193427});
+	FixedBWF.SetWeightingFunction([](double const* params, double linealEnergy) {return params[0];}, 1);
+	FixedBWF.SetValues(std::vector<double> {0.114966});
+	CubicLETBest.alphaFunc = CubicBWF;
+	CubicLETBest.betaFunc = FixedBWF;
+
+	QEBWF.SetValues(std::vector<double>  {  0.209024, -0.105069, 0.000636537 });
+	FixedBWF.SetValues(std::vector<double> {0.114731});
+	BWF_Fitting_Results BestLETH460;
+	BestLETH460.alphaFunc = QEBWF;
+	BestLETH460.betaFunc = FixedBWF;
+
+	AlphaBeta_Fitter fitter{};
+	fitter.SetCellStudyParameters(H460FittingParams);
+	double* AlphaBeta = fitter.Fit(nullptr,false);
+
 	SurvivalDataMultigraph(c, legend, H460FittingParams);
-	TAttLine lineStyle{};
+	// TAttLine lineStyle{};
 	lineStyle.SetLineColor(kRed+2);
 	lineStyle.SetLineWidth(5);
 	lineStyle.SetLineStyle(1);
-	GeneralizedBWFMultigraphPlotterAlphaBeta(c, legend, lineStyle, "Morstin", H460FittingParams, MorstinResults);
+	GeneralizedBWFMultigraphPlotterAlphaBeta(c, legend, lineStyle, "Fourth - d(y)", H460FittingParams, FourthLinearDyBestRegularResults);
 	lineStyle.SetLineColor(kBlue+2);
-	GeneralizedBWFMultigraphPlotterAlphaBeta(c, legend, lineStyle, "Quadratic", H460FittingParams, quadraticResultsfirst);
+	GeneralizedBWFMultigraphPlotterLETAlphaBeta(c, legend, lineStyle, "Fourth - LET", H460FittingParams, FourthLETBest);
 	lineStyle.SetLineColor(kGreen+3);
-	GeneralizedBWFMultigraphPlotterAlphaBeta(c, legend, lineStyle, "LQE2", H460FittingParams, LQE2Results);
-	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/survival_H460_wModels.jpg";
+	MultigraphSurvivalFitPlotter(c, legend, lineStyle, "Direct Fit", H460FittingParams, AlphaBeta);
+	// std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/DirectFitH460.jpg";
+	// GeneralizedBWFMultigraphPlotterLETAlphaBeta(c, legend, lineStyle, "QE - LET", H460FittingParams, BestLETH460);
+	// GeneralizedBWFMultigraphPlotterAlphaBeta(c, legend, lineStyle, "LQE2", H460FittingParams, LQE2Results);
+	std::string outputName = "/home/joseph/Dropbox/Documents/Work/Projects/MDA_vitro_RBE/Images/fitting/survival_H460_Aug23_FourthLETvsDYvsDirect.jpg";
 	c->SaveAs((TString)outputName); 
 
 }
@@ -5518,10 +5628,13 @@ void H460_Consecutive_Fitting()
 
 	Ceres_BWF_Fitter BWFFitter{};
 	std::cout << std::endl << "Linear, Fixed" << std::endl;
+	// LinearBWF.SetValues(std::vector<double> {0.0399, 0.0457});
+	LinearBWF.SetValues(std::vector<double> {0.0457, 0.0399});
+	FixedBWF.SetValues(std::vector<double> {0.1355}); 
 	BWFFitter.SetAlphaWeightingFunction(LinearBWF);
 	BWFFitter.SetBetaWeightingFunction(FixedBWF);
 	BWFFitter.SetCellStudyParameters(H460FittingParams);
-	double penaltyWeight = 0.05; 
+	double penaltyWeight = 0.0; 
 	BWFFitter.SetPositiveConstrained(true, penaltyWeight);
 	BWFFitter.Initialize();
 	auto linearFixedResults = BWFFitter.Fit();
@@ -6661,5 +6774,6 @@ void H460_Consecutive_Fitting()
 
 void H460_Ceres()
 {
-	H460_Consecutive_Fitting();
+	Best_Model_Plotting();
+	// Survival_Fitting();
 }

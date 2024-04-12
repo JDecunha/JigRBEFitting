@@ -245,7 +245,7 @@ TH1D Utilities::GetFy(std::string path, double Energy, std::string TargetSize)
 		}
 	}
 
-	if (fileFound) { return output; } else {throw std::runtime_error("From Utilities::GetDy. Lineal energy histogram not found.");}
+	if (fileFound) { return output; } else {throw std::runtime_error("From Utilities::GetFy. Lineal energy histogram not found.");}
 }
 
 TH1D Utilities::GetNy(std::string path, double Energy, std::string TargetSize)
@@ -334,6 +334,8 @@ void Utilities::VerifyNormalization(const TH1& h)
 	{
 		auto value = h.GetBinContent(i);
 		auto width = h.GetBinWidth(i);
+		//auto edge = h.GetBinLowEdge(i);
+		//std::cout << "Edge: " << edge << " Value: " << value << " Width: " << width << std::endl;
 		totalVal += value*width;
 	}
 

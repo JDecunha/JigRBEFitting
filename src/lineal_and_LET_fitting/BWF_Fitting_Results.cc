@@ -15,6 +15,7 @@ void BWF_Fitting_Results::PrintBasic()
 	std::cout << "Alpha fit params: "; alphaFunc.PrintFitParams();
 	std::cout << std::endl << "Beta fit params: "; betaFunc.PrintFitParams();
 	std::cout << std::endl << "RMSE: " << RMSE << std::endl;
+	std::cout << std::endl << "Cost: " << summary.final_cost << std::endl;
 }
 
 void BWF_Fitting_Results::PrintAIC(double penaltyWeight, int const& numObservations, double lower, double upper)
@@ -92,6 +93,7 @@ void BWF_Fitting_Results::PrintRMSEMinusPenaltyFunction(double penaltyWeight, in
  	//Print
 	std::cout << "Alpha fit params: "; alphaFunc.PrintFitParams();
 	std::cout << std::endl << "Beta fit params: "; betaFunc.PrintFitParams();
+	std::cout << std::endl << "Cost: " << summary.final_cost << std::endl;
 	std::cout << std::endl << "RMSE: " << RMSE << std::endl;
     std::cout << "RMSE Corrected: " << RMSE_Corrected << std::endl;
 

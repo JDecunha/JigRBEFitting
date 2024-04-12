@@ -39,6 +39,7 @@ namespace LinealSpectra
 		std::vector<std::pair<std::string,TH1D>> GetKeWeightedLinealSpectra(std::string targetSize);
 		//New proton spectrum
 		std::vector<std::pair<std::string,TH1D>> GetKeWeightedLinealSpectraJuly2023(std::string targetSize);
+		std::vector<std::pair<std::string,TH1D>> GetKeWeightedLinealFrequencySpectraJuly2023(std::string targetSize);
 		
 		//Plot the weighted lineal energy spectra on a multigraph
 		void PlotKeWeightedLinealSpectra(const std::vector<std::pair<std::string,TH1D>>& linealLibrary);
@@ -50,6 +51,7 @@ namespace LinealSpectra
 		void SaveKeWeightedLinealSpectra();
 		void SaveKeWeightedFrequencyLinealSpectra();
 		void SaveKeWeightedLinealSpectraCSV();
+		void SaveKeWeightedLinealFrequencySpectraCSV();
 
 		//For the Lineal energy library manuscript
 		void CompareGeant4toFluenceWeighting();
